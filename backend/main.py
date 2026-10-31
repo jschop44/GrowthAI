@@ -279,8 +279,8 @@ def pagespeed(audit_id:int, strategy:str='mobile'):
         audits=data['lighthouseResult']['audits']
         return {'audit_id':audit_id,'strategy':strategy,'performance_score':round(categories['performance']['score']*100),'largest_contentful_paint':audits.get('largest-contentful-paint',{}).get('displayValue'),'cumulative_layout_shift':audits.get('cumulative-layout-shift',{}).get('displayValue'),'source':'Google PageSpeed Insights API','note':'Lab measurements; not a revenue estimate.'}
     except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
-        raise HTTPException(502,'PageSpeed request failed or returned incomplete data.') from exc
-        from backend.local_competition import register_local_routes
+        raise HTTPException(502,'PageSpeed request failed or returned incomplete data.') 
+from backend.local_competition import register_local_routes
 
 register_local_routes(
     app,
