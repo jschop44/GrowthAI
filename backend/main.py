@@ -91,7 +91,7 @@ def fetch_public(client, url):
     # network-level egress controls to fully mitigate DNS rebinding / SSRF.
     for _ in range(4):
         validate_url(url)
-        with client.stream('GET', url, follow_redirects=False, headers={'User-Agent':AGENT,'Accept':'text/html'}, timeout=httpx.Timeout(12, connect=5)) as stream:
+        with client.stream('GET', url, follow_redirects=False, headers={'User-Agent':AGENT,'Accept':'text/html','Accept-Encoding':'identity'}, timeout=httpx.Timeout(12, connect=5)) as stream:
             chunks=[]
             total=0
             for chunk in stream.iter_bytes():
