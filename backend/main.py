@@ -281,9 +281,13 @@ def pagespeed(audit_id:int, strategy:str='mobile'):
     except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
         raise HTTPException(502,'PageSpeed request failed or returned incomplete data.') from exc
         from backend.local_competition import register_local_routes
+
 register_local_routes(
-    app, validate_url, fetch_public,
-    robots_allowed, analyze_html
+    app,
+    validate_url,
+    fetch_public,
+    robots_allowed,
+    analyze_html
 )
 @app.get('/local-competition.js')
 def local_competition_script():
