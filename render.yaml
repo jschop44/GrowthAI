@@ -1,0 +1,16 @@
+# Render Blueprint: free web service, no paid disk. SQLite history is EPHEMERAL.
+services:
+  - type: web
+    name: growthlens-free-test
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: GROWTHLENS_PRIVATE_KEY
+        generateValue: true
+      - key: GROWTHLENS_DB
+        value: /tmp/growthlens.db
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
