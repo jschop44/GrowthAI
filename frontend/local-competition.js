@@ -1,5 +1,4 @@
-
-/* GrowthLens AI v0.4 local competitor panel. No dependencies. */
+/* GrowthLens AI v0.5 local competitor panel. No dependencies. */
 (() => {
   'use strict';
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -8,13 +7,28 @@
   panel.id = 'localCompetition';
   panel.innerHTML = `
     <h2>Local Competitor Intelligence</h2>
-    <p class="muted">Discover nearby businesses from OpenStreetMap and compare publicly accessible webpages. Fixed search radius: <strong>15 miles</strong>.</p>
+    <p class="muted">Discover nearby businesses using free OpenStreetMap data and compare publicly accessible webpages.</p>
+    <fieldset id="localRadiusGroup" style="border:0;padding:0;margin:12px 0">
+      <legend style="font-weight:700;margin-bottom:8px">Competitor search radius</legend>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <label><input type="radio" name="localRadius" value="15" checked> 15 miles</label>
+        <label><input type="radio" name="localRadius" value="25"> 25 miles</label>
+        <label><input type="radio" name="localRadius" value="50"> 50 miles</label>
+      </div>
+    </fieldset>
+    <label for="localAddress" style="display:block;margin:10px 0 4px">Business street address (optional; use if website location is missing or incorrect)</label>
+    <input id="localAddress" type="text" maxlength="220" placeholder="Street, city, state, ZIP" style="width:100%;max-width:520px;padding:9px;box-sizing:border-box">
     <button id="localRun" type="button">Analyze Local Competition (15 miles)</button>
     <p id="localStatus" class="muted" role="status"></p>
-    <div id="localOutput"></div>`;
+    <div id="localOutput"></div>
+    <h3>Learning feedback (optional)</h3>
+    <p class="muted small">Save a correction or verified-by-you observation. This is not independently verified and may be lost on free hosting.</p>
+    <label for="learningField">Field</label><select id="learningField" style="padding:10px;background:#0c1d27;color:white"><option value="industry">Industry</option><option value="name">Business name</option><option value="address">Address</option><option value="service">Service</option><option value="correction">Other correction</option></select>
+    <label for="learningValue">Correction or observation</label><input id="learningValue" maxlength="300" placeholder="e.g. Pizza restaurant">
+    <button type="button" id="learningSave">Record feedback</button><p id="learningStatus" role="status"></p>`;
   const results = document.getElementById('results');
   if (!results) return;
-  results.parentNode.insertBefore(panel,results.nextSibling);
+  results.parentNode.insertBefore(panel, results.nextSibling);
   const style = document.createElement('style');
   style.textContent = `
     #localCompetition table{width:100%;border-collapse:collapse;font-size:13px}
@@ -23,7 +37,7 @@
     #localCompetition .localNote{font-size:12px;opacity:.85}
     @media print{
       #localCompetition{display:block!important;background:white!important;color:#172b36!important;border:0!important;padding:0!important;margin-top:20px!important}
-      #localCompetition button,#localStatus{display:none!important}
+      #localCompetition button,#localStatus,#localRadiusGroup,#localAddress,#localCompetition label[for="localAddress"]{display:none!important}
       #localCompetition h2,#localCompetition h3{color:#172b36!important}
       #localCompetition table{font-size:9pt}
       #localCompetition th,#localCompetition td{border-bottom:1px solid #dce5e8!important;color:#172b36!important}
@@ -33,34 +47,52 @@
     }`;
   document.head.appendChild(style);
   const $ = id => document.getElementById(id);
+  const selectedRadius = () => Number(document.querySelector('input[name="localRadius"]:checked')?.value || 15);
+  panel.querySelectorAll('input[name="localRadius"]').forEach(input => input.addEventListener('change', () => {
+    $('localRun').textContent = `Analyze Local Competition (${selectedRadius()} miles)`;
+  }));
+  $('learningSave').onclick = async () => {
+    const key=$('privateKey')?.value.trim(), website=$('url')?.value.trim(), value=$('learningValue').value.trim();
+    if (!key || !website || !value) { $('learningStatus').textContent='Enter the access key, website, and feedback.'; return; }
+    try {
+      const r=await fetch('/api/intelligence/evidence',{method:'POST',headers:{'Content-Type':'application/json','X-GrowthLens-Key':key},body:JSON.stringify({website,field:$('learningField').value,value})});
+      const d=await r.json(); if (!r.ok) throw Error(d.detail || 'Could not save feedback');
+      $('learningStatus').textContent='Feedback recorded as user-asserted (not independently verified). Free-host storage is temporary.';
+    } catch(e) { $('learningStatus').textContent=String(e.message); }
+  };
   $('localRun').onclick = async () => {
     const key = $('privateKey')?.value.trim();
     const url = $('url')?.value.trim() || (typeof activeAuditUrl !== 'undefined' ? activeAuditUrl : '');
     if (!key || !url) { $('localStatus').textContent='Enter your access key and website URL first.'; return; }
+    const radius_miles = selectedRadius();
     $('localRun').disabled=true;
-    $('localStatus').textContent='Checking business metadata, location, and public competitor websites. This may take a minute...';
+    $('localStatus').textContent=`Checking business metadata, location, and competitor websites within ${radius_miles} miles. This may take a minute...`;
     try {
       const res = await fetch('/api/local-competition', {
         method:'POST', headers:{'Content-Type':'application/json','X-GrowthLens-Key':key},
-        body:JSON.stringify({url})
+        body:JSON.stringify({url, radius_miles, business_address: $('localAddress').value.trim() || null})
       });
       const data = await res.json();
       if (!res.ok) throw new Error(typeof data.detail==='string'?data.detail:'Request failed ('+res.status+')');
       const company=data.identity;
       const logo=company.logo_url ? `<img src="${esc(company.logo_url)}" alt="Company logo reported by website" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : '<span class="muted">No logo detected</span>';
-      const rivals=data.competitors.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.distance_miles)} mi</td><td>${c.score===null?'N/A':esc(c.score)+'/100'}</td><td><a href="${esc(c.website)}" target="_blank" rel="noopener noreferrer">Website</a></td><td>${esc(c.status)}</td></tr>`).join('');
+      const rivals=data.competitors.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.distance_miles)} mi</td><td>${c.score===null?'N/A':esc(c.score)+'/100'}</td><td>${c.website ? `<a href="${esc(c.website)}" target="_blank" rel="noopener noreferrer">Website</a>` : "Not listed"}</td><td>${esc(c.status)}</td></tr>`).join('');
       const actions=data.opportunities.slice(0,8).map(o=>`<li><strong>${esc(o.issue)}:</strong> ${esc(o.recommendation)} ${o.competitors_passing_check.length?'<span class="localNote">Competitors passing: '+esc(o.competitors_passing_check.join(', '))+'</span>':''}</li>`).join('');
       $('localOutput').innerHTML=`
-        <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:15px 0">${logo}<div><h3 style="margin:0">${esc(company.name)}</h3><p class="muted" style="margin:5px 0">${esc(company.address||'Physical address not detected')} · ${esc(company.name_source)}</p></div></div>
-        <p><strong>Target technical score:</strong> ${esc(data.audit.score)}/100 · <strong>Radius:</strong> 15 miles</p>
+        <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:15px 0">${logo}<div><h3 style="margin:0">${esc(company.name)}</h3><p class="muted" style="margin:5px 0">${esc(company.address||'Physical address not detected')} Â· ${esc(company.name_source)}</p></div></div>
+        <p><strong>Detected business type:</strong> ${esc(data.classification?.label || 'Unknown')} Â· <strong>Confidence:</strong> ${esc(data.classification?.confidence || 'unknown')}</p>
+        <p class="localNote"><strong>Classification evidence:</strong> ${(data.classification?.evidence || []).map(e => esc(e.source) + ' (' + esc((e.matched_terms || []).join(', ')) + ')').join('; ') || 'Insufficient evidence'}</p>
+        <p><strong>Location source:</strong> ${esc(data.location_source || "Not established")} ${company.address ? `Â· ${esc(company.address)}` : ""}</p>
+        <p><strong>Target technical score:</strong> ${esc(data.audit.score)}/100 Â· <strong>Radius:</strong> ${esc(data.radius_miles)} miles</p>
         ${data.warning?'<p class="bad">'+esc(data.warning)+'</p>':''}
-        <h3>Nearby competitors (${data.competitors.length} found with websites)</h3>
-        <table><thead><tr><th>Business</th><th>Distance</th><th>Technical score</th><th>Source website</th><th>Audit status</th></tr></thead><tbody>${rivals||'<tr><td colspan="5">No category-matched competitors with public websites were verified.</td></tr>'}</tbody></table>
+        <h3>Nearby competitors (${data.competitors.length} found in public listings)</h3>
+        <table><thead><tr><th>Business</th><th>Distance</th><th>Technical score</th><th>Source website</th><th>Audit status</th></tr></thead><tbody>${rivals||'<tr><td colspan="5">No matching competitors were found in available public listings.</td></tr>'}</tbody></table>
         <p class="localNote">${esc(data.discovery_source)}. All scores use the same single-page technical checklist. N/A is not zero.</p>
+        <h3>Industry-specific opportunities</h3><ol>${(data.industry_recommendations||[]).map(x=>`<li><strong>${esc(x.issue)}:</strong> ${esc(x.recommendation)} <span class="localNote">${esc(x.evidence)}</span></li>`).join('') || '<li>No additional homepage-specific signals identified.</li>'}</ol>
         <h3>Business-specific action plan</h3><ol>${actions||'<li>No failed technical checks were identified on the target page.</li>'}</ol>
         <h3>Traffic and revenue evidence</h3><p><strong>Verified visits:</strong> Unavailable. ${esc(data.traffic.status)}</p><p><strong>Verified revenue opportunity:</strong> Unavailable. ${esc(data.revenue.status)}</p>
         <p class="localNote">${esc(data.limitations.join(' '))}</p>`;
-      $('localStatus').textContent='Local analysis complete. You can print this section with the main report.';
+      $('localStatus').textContent=`Local ${data.radius_miles}-mile analysis complete. You can print this section with the main report.`;
     } catch(e) { $('localStatus').textContent=e.message; }
     finally { $('localRun').disabled=false; }
   };
