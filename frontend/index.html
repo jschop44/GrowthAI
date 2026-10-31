@@ -2,843 +2,741 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GrowthLens AI</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GrowthLens AI | Website Audit</title>
+<style>
+:root {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #e9f4f5;
+  background: #091820;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+header {
+  padding: 22px 5%;
+  border-bottom: 1px solid #29434d;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.brand {
+  color: #75e4c5;
+  font-size: 23px;
+  font-weight: 800;
+}
+.tag, .small { font-size: 13px; }
+.tag, .muted { color: #a5bac2; }
+main {
+  max-width: 1100px;
+  margin: auto;
+  padding: 25px 18px;
+}
+h1 { font-size: clamp(30px, 5vw, 48px); }
+h2 { margin-top: 0; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 18px;
+}
+.card {
+  background: #142a35;
+  border: 1px solid #304e59;
+  border-radius: 15px;
+  padding: 22px;
+  margin-bottom: 18px;
+}
+label { display: block; margin: 12px 0 6px; }
+input {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  background: #0c1d27;
+  border: 1px solid #55727b;
+  border-radius: 8px;
+  color: white;
+  font-size: 16px;
+}
+button {
+  margin: 14px 5px 0 0;
+  padding: 13px 18px;
+  border: 0;
+  border-radius: 9px;
+  background: #65dbb9;
+  color: #09251e;
+  font-weight: 700;
+  cursor: pointer;
+}
+button:disabled { opacity: .5; cursor: wait; }
+.score {
+  font-size: 60px;
+  color: #7de7c2;
+  font-weight: 800;
+}
+.finding {
+  padding: 14px 0;
+  border-bottom: 1px solid #34515b;
+}
+.ok { color: #7de7c2; }
+.bad { color: #ffb18b; }
+.hidden { display: none !important; }
+a { color: #7de7c2; }
+#extras, #status { white-space: pre-wrap; }
+#extras { margin-top: 18px; }
+footer {
+  text-align: center;
+  padding: 28px;
+  color: #9cb4bc;
+}
+.report-only { display: none; }
+.report-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 
-  <style>
-    :root {
-      font-family: system-ui, -apple-system, sans-serif;
-      color: #e9f4f5;
-      background: #091820;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-    }
-
-    header {
-      padding: 22px 5%;
-      border-bottom: 1px solid #29434d;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .brand {
-      color: #75e4c5;
-      font-size: 23px;
-      font-weight: 800;
-    }
-
-    .tag {
-      font-size: 12px;
-      color: #a4bbc2;
-    }
-
-    main {
-      max-width: 1100px;
-      margin: auto;
-      padding: 25px 18px;
-    }
-
-    h1 {
-      font-size: clamp(30px, 5vw, 48px);
-    }
-
-    h2 {
-      margin-top: 0;
-    }
-
-    .muted {
-      color: #a5bac2;
-    }
-
-    .small {
-      font-size: 13px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(
-        auto-fit,
-        minmax(270px, 1fr)
-      );
-      gap: 18px;
-    }
-
-    .card {
-      background: #142a35;
-      border: 1px solid #304e59;
-      border-radius: 15px;
-      padding: 22px;
-      margin-bottom: 18px;
-    }
-
-    label {
-      display: block;
-      margin: 12px 0 6px;
-    }
-
-    input {
-      display: block;
-      width: 100%;
-      padding: 13px;
-      background: #0c1d27;
-      border: 1px solid #55727b;
-      border-radius: 8px;
-      color: white;
-      font-size: 16px;
-    }
-
-    button {
-      margin-top: 14px;
-      padding: 13px 18px;
-      border: 0;
-      border-radius: 9px;
-      background: #65dbb9;
-      color: #09251e;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: wait;
-    }
-
-    .score {
-      font-size: 60px;
-      color: #7de7c2;
-      font-weight: 800;
-    }
-
-    .finding {
-      padding: 14px 0;
-      border-bottom: 1px solid #34515b;
-    }
-
-    .ok {
-      color: #7de7c2;
-    }
-
-    .bad {
-      color: #ffb18b;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    a {
-      color: #7de7c2;
-    }
-
-    #extras {
-      white-space: pre-wrap;
-      margin-top: 18px;
-    }
-
-    #status {
-      white-space: pre-wrap;
-    }
-
-    footer {
-      text-align: center;
-      padding: 28px;
-      color: #9cb4bc;
-    }
-
-    
 @media print {
-
-  @page {
-    size: letter;
-    margin: 0.65in;
-  }
+  @page { size: letter; margin: .65in; }
 
   * {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  html,
-  body {
-    background: #ffffff !important;
+  html, body {
+    background: white !important;
     color: #172b36 !important;
-    font-family: Arial, Helvetica, sans-serif;
-    font-size: 11pt;
-    margin: 0;
-    padding: 0;
+    font: 10pt Arial, Helvetica, sans-serif;
   }
 
-  /* Hide everything except the finished report */
-  header,
-  footer,
-  main > h1,
-  main > p,
-  main > .grid,
-  main > .card:not(#results),
-  #history,
-  #aiButton,
-  #speedButton,
-  #printButton {
+  header, footer, main > h1, main > p,
+  main > .grid, main > .card:not(#results),
+  #aiButton, #speedButton, #printButton,
+  #extras, #results > .muted.small {
     display: none !important;
   }
 
-  main {
-    max-width: none;
-    margin: 0;
-    padding: 0;
-  }
+  main { max-width: none; margin: 0; padding: 0; }
 
   #results {
     display: block !important;
-    background: #ffffff !important;
+    background: white !important;
     color: #172b36 !important;
-    border: none !important;
-    border-radius: 0 !important;
+    border: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
     box-shadow: none !important;
   }
 
-  /* Branded report heading */
-  #results::before {
-    content: "GROWTHLENS AI  /  WEBSITE AUDIT REPORT";
-    display: block;
-    color: #087f70;
-    font-size: 11pt;
-    font-weight: 800;
-    letter-spacing: 1.4px;
-    padding: 0 0 15px;
-    margin-bottom: 24px;
+  .report-only { display: block !important; }
+
+  #reportHeader {
     border-bottom: 3px solid #087f70;
+    padding: 0 0 18px;
+    margin-bottom: 20px;
   }
 
-  #results > h2 {
-    color: #172b36 !important;
-    font-size: 24pt;
-    margin: 0 0 18px;
+  #reportHeader .kicker {
+    font-weight: 800;
+    color: #087f70;
+    letter-spacing: 1.7px;
+    font-size: 9pt;
+  }
+
+  #reportHeader h1 {
+    font-size: 26pt;
+    margin: 12px 0 9px;
+    color: #172b36;
+  }
+
+  #reportHeader .report-meta {
+    font-size: 9pt;
+    color: #50636c;
+  }
+
+  #reportExecutive {
+    padding: 17px 19px;
+    background: #f0f8f6 !important;
+    border: 1px solid #d4e9e2;
+    border-radius: 7px;
+    break-inside: avoid;
+    margin: 20px 0;
+  }
+
+  #reportExecutive h3,
+  #reportPriorities h3 {
+    font-size: 15pt;
+    color: #172b36;
+    margin: 0 0 10px;
+  }
+
+  #reportExecutive p {
+    margin: 8px 0;
+    line-height: 1.5;
+  }
+
+  #reportPriorities {
+    margin: 20px 0;
+    break-inside: avoid;
+  }
+
+  #reportPriorityList {
+    padding: 0 0 0 20px;
+    margin: 8px 0;
+  }
+
+  #reportPriorityList li {
+    padding: 5px 0;
+    line-height: 1.5;
+  }
+
+  #results > h2 { display: none !important; }
+
+  #results > h3 {
+    font-size: 15pt;
+    color: #172b36;
+    border-bottom: 1px solid #dce5e8;
+    padding-bottom: 9px;
+    margin: 20px 0 10px;
   }
 
   #summary {
-    background: #f0f8f6 !important;
-    border: 1px solid #d4e9e2;
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 28px;
+    padding: 12px 16px;
+    background: #f6f9fa !important;
+    border: 1px solid #e2e9eb;
+    border-radius: 6px;
     break-inside: avoid;
   }
 
-  .score {
+  #summary .score {
+    font-size: 30pt;
     color: #087f70 !important;
-    font-size: 46pt;
-    line-height: 1.1;
-    font-weight: 800;
-    margin-bottom: 8px;
   }
 
   #summary p {
+    margin: 5px 0;
     color: #435866 !important;
-    margin: 8px 0;
-    overflow-wrap: anywhere;
   }
 
-  #results > h3 {
-    color: #172b36 !important;
-    font-size: 17pt;
-    border-bottom: 1px solid #cbdadf;
-    padding-bottom: 10px;
-    margin: 24px 0 12px;
-  }
-
-  #findings {
-    display: block;
-  }
-
-  .finding {
-    display: block;
-    background: #ffffff !important;
-    padding: 13px 0;
-    margin: 0;
+  #findings .finding {
+    padding: 9px 0;
     border-bottom: 1px solid #dce5e8;
     break-inside: avoid;
-    page-break-inside: avoid;
   }
 
-  .finding strong {
+  #findings .finding strong {
     color: #172b36 !important;
-    font-size: 11pt;
   }
 
-  .finding .ok,
-  .ok {
+  #findings .finding .ok {
     color: #087f70 !important;
   }
 
-  .finding .bad,
-  .bad {
+  #findings .finding .bad {
     color: #b34b29 !important;
   }
 
-  .finding p {
+  #findings .finding p {
     color: #50626e !important;
-    font-size: 10pt;
-    line-height: 1.5;
-    margin: 7px 0 0;
+    margin: 4px 0;
+    font-size: 9pt;
   }
 
-  #extras {
-    display: block;
-    color: #273d48 !important;
-    background: #f5f8fa !important;
-    border-left: 3px solid #087f70;
-    padding: 14px;
-    margin: 20px 0;
-    font-size: 10pt;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    break-inside: avoid;
-  }
-
-  #extras:empty {
-    display: none;
-  }
-
-  #results > p.small {
-    color: #647580 !important;
-    font-size: 8.5pt;
-    line-height: 1.5;
-    border-top: 1px solid #dce5e8;
-    margin-top: 25px;
+  #reportFooter {
+    margin-top: 24px;
     padding-top: 12px;
-  }
-
-  #results::after {
-    content: "GrowthLens AI  |  Confidential Client Report";
-    display: block;
-    color: #7b8d96;
+    border-top: 1px solid #dce5e8;
     font-size: 8pt;
-    text-align: center;
-    border-top: 1px solid #dce5e8;
-    padding-top: 12px;
-    margin-top: 22px;
+    color: #647580 !important;
+    line-height: 1.5;
+  }
+
+  a {
+    color: #087f70 !important;
+    text-decoration: none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">GrowthLens AI</div>
+  <div class="tag">Private Beta · v0.3</div>
+</header>
+
+<main>
+  <h1>Find your website's growth opportunities.</h1>
+  <p class="muted">
+    Analyze a public webpage, identify technical SEO issues,
+    and explore hypothetical revenue improvements.
+  </p>
+
+  <section class="card">
+    <h2>Private Access</h2>
+    <label for="privateKey">Access key</label>
+    <input id="privateKey" type="password"
+      autocomplete="off" placeholder="Enter access key">
+    <p class="muted small">
+      Your key is not saved in browser storage.
+    </p>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Website Audit</h2>
+      <form id="auditForm">
+        <label for="url">Website URL</label>
+        <input id="url" type="text"
+          placeholder="https://example.com" required>
+        <button id="auditButton" type="submit">
+          Analyze Website
+        </button>
+      </form>
+      <p class="muted small">
+        Checks one public HTML page. Some websites block automated audits.
+      </p>
+      <p id="status" role="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>Revenue Scenario</h2>
+      <form id="revenueForm">
+        <label for="visitors">Monthly visitors</label>
+        <input id="visitors" type="number" min="0"
+          value="10000" required>
+
+        <label for="conversion">Conversion rate (%)</label>
+        <input id="conversion" type="number"
+          min="0" max="100" step="0.1" value="2" required>
+
+        <label for="value">Revenue per conversion ($)</label>
+        <input id="value" type="number"
+          min="0" step="0.01" value="150" required>
+
+        <label for="improvement">Assumed improvement (%)</label>
+        <input id="improvement" type="number"
+          min="0" max="1000" value="20" required>
+
+        <button type="submit">Calculate Scenario</button>
+      </form>
+      <div id="revenueResult"></div>
+    </section>
+  </div>
+
+  <section class="card hidden" id="results">
+
+    <div id="reportHeader" class="report-only">
+      <div class="kicker">
+        GROWTHLENS AI / CLIENT WEBSITE AUDIT
+      </div>
+      <h1 id="reportCompany">Website Audit</h1>
+      <div class="report-meta">
+        <span id="reportWebsite"></span>
+        <span id="reportDate"></span>
+      </div>
+    </div>
+
+    <section id="reportExecutive" class="report-only">
+      <h3>Executive Summary</h3>
+      <p id="reportExecutiveText"></p>
+      <p id="reportScope"></p>
+    </section>
+
+    <section id="reportPriorities" class="report-only">
+      <h3>Prioritized Recommendations</h3>
+      <ol id="reportPriorityList"></ol>
+    </section>
+
+    <h2>Audit Results</h2>
+    <div id="summary"></div>
+
+    <h3>Detailed Technical Findings</h3>
+    <div id="findings"></div>
+
+    <button id="aiButton" type="button">
+      Generate Recommendations
+    </button>
+
+    <button id="speedButton" type="button">
+      Check Mobile PageSpeed
+    </button>
+
+    <div id="extras" class="muted"></div>
+
+    <p class="muted small">
+      Scores reflect technical checks on one page.
+      Revenue projections are scenarios, not verified forecasts.
+    </p>
+
+    <button id="printButton" type="button">
+      Print Report
+    </button>
+
+    <div id="reportFooter" class="report-only">
+      Prepared by GrowthLens AI. This automated audit examines
+      one publicly accessible page only. The score is a technical
+      checklist score, not a measure of business growth, search
+      rankings, traffic, competitor performance, or revenue.
+      Findings should be reviewed before implementation.
+      · Confidential client report
+    </div>
+
+  </section>
+
+  <section class="card">
+    <h2>Recent Audits</h2>
+    <div id="history" class="muted">
+      Enter your access key to load audit history.
+    </div>
+  </section>
+</main>
+
+<footer>GrowthLens AI · Development MVP</footer>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+
+const esc = v => String(v ?? "").replace(
+  /[&<>"']/g,
+  c => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[c])
+);
+
+const money = v => new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0
+}).format(v);
+
+let activeAudit = null;
+let activeAuditUrl = "";
+let activeAuditDate = null;
+
+async function api(path, options = {}) {
+  const key = $("privateKey").value.trim();
+
+  if (!key) {
+    throw Error("Enter your private access key first.");
+  }
+
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      "X-GrowthLens-Key": key
+    }
+  });
+
+  let data;
+
+  try {
+    data = await response.json();
+  } catch {
+    throw Error("The server returned an unexpected response.");
+  }
+
+  if (!response.ok) {
+    throw Error(
+      typeof data.detail === "string"
+        ? data.detail
+        : "Request failed (" + response.status + ")"
+    );
+  }
+
+  return data;
+}
+
+function reportDate(raw) {
+  const d = raw ? new Date(raw) : new Date();
+
+  const date = Number.isNaN(d.getTime()) ? new Date() : d;
+
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+}
+
+function populateReport(data) {
+  const findings = Array.isArray(data.findings)
+    ? data.findings
+    : [];
+
+  const failed = findings
+    .filter(f => !f.passed)
+    .sort((a, b) =>
+      Number(b.weight || 0) - Number(a.weight || 0)
+    );
+
+  const passed = findings.length - failed.length;
+
+  let host = "Website";
+
+  try {
+    host = new URL(data.url).hostname.replace(/^www\./i, "");
+  } catch {}
+
+  const company = host
+    .split(".")[0]
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, c => c.toUpperCase());
+
+  $("reportCompany").textContent =
+    company + " | Website Audit";
+
+  $("reportWebsite").textContent =
+    data.url || host;
+
+  $("reportDate").textContent =
+    "Audit date: " + reportDate(activeAuditDate);
+
+  $("reportExecutiveText").textContent =
+    "This automated review scored " +
+    (data.score ?? "—") +
+    "/100 on the technical checklist. " +
+    passed + " of " + findings.length +
+    " checks passed. " +
+    (
+      failed.length
+        ? "The highest-weight failed check is " +
+          failed[0].name.toLowerCase() +
+          ". The prioritized actions below address observed " +
+          "technical gaps; resulting business improvements " +
+          "are not measured or guaranteed."
+        : "All evaluated checks passed. This does not establish " +
+          "rankings, site-wide SEO health, or business performance."
+    );
+
+  $("reportScope").textContent =
+    "Scope: one publicly accessible HTML page. " +
+    "No competitor, search ranking, traffic, social, " +
+    "conversion, or actual revenue data was measured.";
+
+  $("reportPriorityList").innerHTML = failed.length
+    ? failed.map((f, i) =>
+        "<li><strong>Priority " + (i + 1) + ": " +
+        esc(f.name) + "</strong> — " +
+        esc(f.recommendation) +
+        " <span style='color:#647580'>(" +
+        esc(f.weight) +
+        "-point check)</span></li>"
+      ).join("")
+    : "<li>Maintain existing technical practices and " +
+      "consider a broader site-wide audit.</li>";
+}
+
+function render(data, createdAt = null) {
+  activeAudit = data.id || activeAudit;
+  activeAuditUrl = data.url || activeAuditUrl;
+  activeAuditDate =
+    createdAt || data.created_at || new Date().toISOString();
+
+  $("results").classList.remove("hidden");
+  $("extras").textContent = "";
+
+  populateReport(data);
+
+  $("summary").innerHTML =
+    "<div class='score'>" +
+    esc(data.score ?? "—") +
+    "/100</div>" +
+    "<p>" +
+    esc(data.scoring_scope || "Single-page technical audit") +
+    "</p><p>" +
+    esc(data.url) +
+    "</p>";
+
+  $("findings").innerHTML = (data.findings || [])
+    .map(f =>
+      "<div class='finding'><strong class='" +
+      (f.passed ? "ok" : "bad") +
+      "'>" +
+      (f.passed ? "✓" : "✕") +
+      " " + esc(f.name) +
+      "</strong> · " + esc(f.weight) +
+      " points<p>" +
+      esc(f.passed ? "Check passed." : f.recommendation) +
+      "</p></div>"
+    ).join("");
+
+  $("results").scrollIntoView({ behavior: "smooth" });
+}
+
+async function loadHistory() {
+  try {
+    const rows = await api("/api/audits");
+
+    $("history").innerHTML = rows.length
+      ? rows.map(r =>
+          "<div class='finding'><a href='#' data-id='" +
+          esc(r.id) + "'>" +
+          esc(r.url) +
+          "</a> — " +
+          esc(r.status) +
+          " " + esc(r.score ?? "—") +
+          "/100</div>"
+        ).join("")
+      : "No audits yet.";
+
+    document.querySelectorAll("#history [data-id]")
+      .forEach(link => {
+        link.onclick = async e => {
+          e.preventDefault();
+
+          try {
+            const item = await api(
+              "/api/audits/" + link.dataset.id
+            );
+
+            if (item.result) {
+              render(
+                { ...item.result, id: item.id },
+                item.created_at
+              );
+            } else {
+              $("status").textContent =
+                "This audit has no completed results.";
+            }
+          } catch (err) {
+            $("status").textContent = err.message;
+          }
+        };
+      });
+  } catch (err) {
+    $("history").textContent = err.message;
   }
 }
 
-      }
-    }
-  </style>
-</head>
-
-<body>
-
-  <header>
-    <div class="brand">GrowthLens AI</div>
-    <div class="tag">Private Beta - v0.3</div>
-  </header>
-
-  <main>
-
-    <h1>Find your website's growth opportunities.</h1>
-
-    <p class="muted">
-      Analyze a public webpage, identify technical SEO
-      issues, and explore hypothetical revenue improvements.
-    </p>
-
-    <section class="card">
-      <h2>Private Access</h2>
-
-      <label for="privateKey">Access key</label>
-
-      <input
-        id="privateKey"
-        type="password"
-        autocomplete="off"
-        placeholder="Enter access key"
-      >
-
-      <p class="muted small">
-        Your key is not saved in browser storage.
-      </p>
-    </section>
-
-    <div class="grid">
-
-      <section class="card">
-        <h2>Website Audit</h2>
-
-        <form id="auditForm">
-          <label for="url">Website URL</label>
-
-          <input
-            id="url"
-            type="text"
-            placeholder="https://example.com"
-            required
-          >
-
-          <button id="auditButton" type="submit">
-            Analyze Website
-          </button>
-        </form>
-
-        <p class="muted small">
-          Checks one public HTML page.
-          Some websites block automated audits.
-        </p>
-
-        <p id="status" role="status"></p>
-      </section>
-
-      <section class="card">
-        <h2>Revenue Scenario</h2>
-
-        <form id="revenueForm">
-
-          <label for="visitors">
-            Monthly visitors
-          </label>
-          <input
-            id="visitors"
-            type="number"
-            min="0"
-            value="10000"
-            required
-          >
-
-          <label for="conversion">
-            Conversion rate (%)
-          </label>
-          <input
-            id="conversion"
-            type="number"
-            min="0"
-            max="100"
-            step="0.1"
-            value="2"
-            required
-          >
-
-          <label for="value">
-            Revenue per conversion ($)
-          </label>
-          <input
-            id="value"
-            type="number"
-            min="0"
-            step="0.01"
-            value="150"
-            required
-          >
-
-          <label for="improvement">
-            Assumed improvement (%)
-          </label>
-          <input
-            id="improvement"
-            type="number"
-            min="0"
-            max="1000"
-            value="20"
-            required
-          >
-
-          <button type="submit">
-            Calculate Scenario
-          </button>
-        </form>
-
-        <div id="revenueResult"></div>
-      </section>
-
-    </div>
-
-    <section class="card hidden" id="results">
-
-      <h2>Audit Results</h2>
-
-      <div id="summary"></div>
-
-      <h3>Checks and Recommendations</h3>
-
-      <div id="findings"></div>
-
-      <button id="aiButton" type="button">
-        Generate Recommendations
-      </button>
-
-      <button id="speedButton" type="button">
-        Check Mobile PageSpeed
-      </button>
-
-      <div id="extras" class="muted"></div>
-
-      <p class="muted small">
-        Scores reflect technical checks on one page.
-        Revenue projections are scenarios,
-        not verified forecasts.
-      </p>
-
-      <button id="printButton" type="button">
-        Print Report
-      </button>
-
-    </section>
-
-    <section class="card">
-
-      <h2>Recent Audits</h2>
-
-      <div id="history" class="muted">
-        Enter your access key to load audit history.
-      </div>
-
-    </section>
-
-  </main>
-
-  <footer>
-    GrowthLens AI - Development MVP
-  </footer>
-
-  <script>
-    "use strict";
-
-    const $ = id => document.getElementById(id);
-
-    const esc = value =>
-      String(value ?? "").replace(
-        /[&<>"']/g,
-        character => ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#39;"
-        }[character])
-      );
-
-    const money = value =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0
-      }).format(value);
-
-    let activeAudit = null;
-    let activeAuditUrl = "";
-
-    async function api(path, options = {}) {
-      const key = $("privateKey").value.trim();
-
-      if (!key) {
-        throw new Error(
-          "Enter your private access key first."
-        );
-      }
-
-      const response = await fetch(path, {
-        ...options,
-        headers: {
-          ...(options.headers || {}),
-          "X-GrowthLens-Key": key
-        }
-      });
-
-      let data;
-
-      try {
-        data = await response.json();
-      } catch {
-        throw new Error(
-          "The server returned an unexpected response."
-        );
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          typeof data.detail === "string"
-            ? data.detail
-            : "Request failed (" + response.status + ")"
-        );
-      }
-
-      return data;
-    }
-
-    function render(data) {
-      activeAudit = data.id || activeAudit;
-      activeAuditUrl = data.url || activeAuditUrl;
-
-      $("results").classList.remove("hidden");
-      $("extras").textContent = "";
-
-      $("summary").innerHTML = `
-        <div class="score">
-          ${esc(data.score)}/100
-        </div>
-
-        <p>${esc(data.scoring_scope)}</p>
-
-        <p class="muted">
-          ${esc(data.url)}
-        </p>
-      `;
-
-      const findings = data.findings || [];
-
-      $("findings").innerHTML = findings.map(f => `
-        <div class="finding">
-
-          <strong class="${f.passed ? "ok" : "bad"}">
-            ${f.passed ? "✓" : "✕"}
-            ${esc(f.name)}
-          </strong>
-
-          - ${esc(f.weight)} points
-
-          <p class="muted">
-            ${esc(
-              f.passed
-                ? "Check passed."
-                : f.recommendation
-            )}
-          </p>
-
-        </div>
-      `).join("");
-
-      $("results").scrollIntoView({
-        behavior: "smooth"
-      });
-    }
-
-    async function loadHistory() {
-      try {
-        const rows = await api("/api/audits");
-
-        $("history").innerHTML = rows.length
-          ? rows.map(r => `
-              <div class="finding">
-                <a href="#" data-id="${r.id}">
-                  ${esc(r.url)}
-                </a>
-
-                - ${esc(r.status)}
-                ${esc(r.score ?? "—")}/100
-              </div>
-            `).join("")
-          : "No audits yet.";
-
-        document.querySelectorAll(
-          "#history [data-id]"
-        ).forEach(link => {
-
-          link.onclick = async event => {
-            event.preventDefault();
-
-            try {
-              const item = await api(
-                "/api/audits/" + link.dataset.id
-              );
-
-              if (item.result) {
-                render({
-                  ...item.result,
-                  id: item.id
-                });
-              } else {
-                $("status").textContent =
-                  "This audit has no completed results.";
-              }
-
-            } catch (error) {
-              $("status").textContent =
-                error.message;
-            }
-          };
-        });
-
-      } catch (error) {
-        $("history").textContent = error.message;
-      }
-    }
-
-    $("auditForm").onsubmit = async event => {
-      event.preventDefault();
-
-      const button = $("auditButton");
-
-      button.disabled = true;
-
-      $("status").textContent =
-        "Analyzing website. Please wait...";
-
-      try {
-        const data = await api("/api/audits", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            url: $("url").value.trim()
-          })
-        });
-
-        render(data);
-
-        $("status").textContent =
-          "Audit complete.";
-
-        await loadHistory();
-
-      } catch (error) {
-        $("status").textContent =
-          error.message;
-
-      } finally {
-        button.disabled = false;
-      }
-    };
-
-    $("revenueForm").onsubmit = async event => {
-      event.preventDefault();
-
-      try {
-        const data = await api(
-          "/api/revenue-scenario",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              monthly_visits:
-                Number($("visitors").value),
-
-              conversion_rate_percent:
-                Number($("conversion").value),
-
-              revenue_per_conversion:
-                Number($("value").value),
-
-              improvement_percent:
-                Number($("improvement").value)
-            })
-          }
-        );
-
-        $("revenueResult").innerHTML = `
-          <h3 class="ok">
-            ${money(data.additional_annual_revenue)}
-            additional annual revenue
-          </h3>
-
-          <p>
-            Baseline:
-            ${money(data.baseline_annual_revenue)}
-          </p>
-
-          <p>
-            Projected:
-            ${money(data.projected_annual_revenue)}
-          </p>
-
-          <p class="muted small">
-            ${esc(data.disclaimer)}
-          </p>
-        `;
-
-      } catch (error) {
-        $("revenueResult").textContent =
-          error.message;
-      }
-    };
-
-    $("privateKey").addEventListener(
-      "change",
-      loadHistory
-    );
-
-    $("aiButton").onclick = async () => {
-      if (!activeAudit) {
-        $("extras").textContent =
-          "Run a website audit first.";
-        return;
-      }
-
-      $("extras").textContent =
-        "Generating recommendations...";
-
-      try {
-        const data = await api("/api/ai-explain", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            audit_id: activeAudit
-          })
-        });
-
-        $("extras").textContent =
-          data.explanation;
-
-      } catch (error) {
-        $("extras").textContent =
-          error.message;
-      }
-    };
-
-    // PageSpeed opens Google's free web report.
-    // No Google API key or quota is required here.
-
-    $("speedButton").onclick = () => {
-      const url = (
-        activeAuditUrl ||
-        $("url").value
-      ).trim();
-
-      if (!url) {
-        $("extras").textContent =
-          "Enter a website URL first.";
-        return;
-      }
-
-      const website = /^https?:\/\//i.test(url)
-        ? url
-        : "https://" + url;
-
-      const reportUrl =
-        "https://pagespeed.web.dev/analysis?url=" +
-        encodeURIComponent(website);
-
-      // Direct user action allows opening a new tab.
-      const opened = window.open(
-        reportUrl,
-        "_blank",
-        "noopener,noreferrer"
-      );
-
-      $("extras").textContent =
-        "Opening Google's PageSpeed Insights report. " +
-        "If a new tab does not appear, check your " +
-        "browser's pop-up settings.";
-    };
-
-    $("printButton").onclick = () => {
-      window.print();
-    };
-
-  </script>
-
+$("auditForm").onsubmit = async e => {
+  e.preventDefault();
+
+  const b = $("auditButton");
+  b.disabled = true;
+
+  $("status").textContent =
+    "Analyzing website. Please wait...";
+
+  try {
+    const data = await api("/api/audits", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: $("url").value.trim()
+      })
+    });
+
+    render(data);
+    $("status").textContent = "Audit complete.";
+
+    await loadHistory();
+  } catch (err) {
+    $("status").textContent = err.message;
+  } finally {
+    b.disabled = false;
+  }
+};
+
+$("revenueForm").onsubmit = async e => {
+  e.preventDefault();
+
+  try {
+    const data = await api("/api/revenue-scenario", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        monthly_visits: Number($("visitors").value),
+        conversion_rate_percent: Number($("conversion").value),
+        revenue_per_conversion: Number($("value").value),
+        improvement_percent: Number($("improvement").value)
+      })
+    });
+
+    $("revenueResult").innerHTML =
+      "<h3 class='ok'>" +
+      money(data.additional_annual_revenue) +
+      " additional annual revenue</h3>" +
+      "<p>Baseline: " +
+      money(data.baseline_annual_revenue) +
+      "</p><p>Projected: " +
+      money(data.projected_annual_revenue) +
+      "</p><p class='muted small'>" +
+      esc(data.disclaimer) +
+      "</p>";
+  } catch (err) {
+    $("revenueResult").textContent = err.message;
+  }
+};
+
+$("privateKey").addEventListener("change", loadHistory);
+
+$("aiButton").onclick = async () => {
+  if (!activeAudit) {
+    $("extras").textContent =
+      "Run a website audit first.";
+    return;
+  }
+
+  $("extras").textContent =
+    "Generating recommendations...";
+
+  try {
+    const data = await api("/api/ai-explain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        audit_id: activeAudit
+      })
+    });
+
+    $("extras").textContent = data.explanation;
+  } catch (err) {
+    $("extras").textContent = err.message;
+  }
+};
+
+$("speedButton").onclick = () => {
+  const url = (
+    activeAuditUrl || $("url").value
+  ).trim();
+
+  if (!url) {
+    $("extras").textContent =
+      "Enter a website URL first.";
+    return;
+  }
+
+  const website = /^https?:\/\//i.test(url)
+    ? url
+    : "https://" + url;
+
+  const reportUrl =
+    "https://pagespeed.web.dev/analysis?url=" +
+    encodeURIComponent(website);
+
+  window.open(
+    reportUrl,
+    "_blank",
+    "noopener,noreferrer"
+  );
+
+  $("extras").textContent =
+    "Opening Google's PageSpeed Insights report. " +
+    "If a new tab does not appear, check your " +
+    "browser's pop-up settings.";
+};
+
+$("printButton").onclick = () => window.print();
+
+</script>
 </body>
 </html>
