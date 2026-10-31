@@ -349,7 +349,24 @@ $("aiButton").onclick = async () => {
   }
 };
 
-$("speedButton").onclick = async () => {
+$("speedButton").onclick = () => {
+  const url = $("url").value.trim();
+
+  if (!url) {
+    $("extras").textContent = "Enter a website URL first.";
+    return;
+  }
+
+  const website = /^https?:\/\//i.test(url)
+    ? url
+    : "https://" + url;
+
+  const reportUrl =
+    "https://pagespeed.web.dev/analysis?url=" +
+    encodeURIComponent(website);
+
+  window.open(reportUrl, "_blank", "noopener,noreferrer");
+};
   if (!activeAudit) return;
 
   $("extras").textContent = "Checking PageSpeed...";
