@@ -348,7 +348,9 @@ $("aiButton").onclick = async () => {
     $("extras").textContent = error.message;
   }
 };
+$("speedButton").onclick = () => {
 
+  const url = $("url").value.trim();
 
   if (!url) {
     $("extras").textContent = "Enter a website URL first.";
