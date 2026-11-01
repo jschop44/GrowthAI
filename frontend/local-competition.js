@@ -35,7 +35,23 @@
     <p class="muted small">Save a correction or observation. User feedback is not independently verified; durable storage is checked separately.</p>
     <label for="learningField">Field</label><select id="learningField" style="padding:10px;background:#0c1d27;color:white"><option value="industry">Industry</option><option value="name">Business name</option><option value="address">Address</option><option value="service">Service</option><option value="correction">Other correction</option></select>
     <label for="learningValue">Correction or observation</label><input id="learningValue" maxlength="300" placeholder="e.g. Pizza restaurant">
-    <button type="button" id="learningSave">Record feedback</button><p id="learningStatus" role="status"></p>`;
+    <button type="button" id="learningSave">Record feedback</button><p id="learningStatus" role="status"></p>
+    <h3>Neural intelligence &amp; outcomes</h3>
+    <p class="muted">Search saved evidence, compare historical observations, and record measured outcomes. Results retain their verification status.</p>
+    <label for="neuralQuery">Evidence question</label><input id="neuralQuery" maxlength="500" placeholder="e.g. Website performance and local competitors">
+    <button type="button" id="neuralSearch">Search evidence</button>
+    <button type="button" id="historyCompare">Compare historical audits</button>
+    <div id="neuralResults" role="status"></div>
+    <h3>Measure recommendation results</h3>
+    <label for="outcomeId">Recommendation ID</label><input id="outcomeId" maxlength="120" placeholder="e.g. improve-mobile-speed">
+    <label for="outcomeMetric">Metric</label><input id="outcomeMetric" maxlength="80" placeholder="e.g. Mobile performance score">
+    <label for="outcomeBaseline">Before</label><input id="outcomeBaseline" type="number" step="any">
+    <label for="outcomeObserved">After</label><input id="outcomeObserved" type="number" step="any">
+    <label for="outcomeDirection">Desired direction</label><select id="outcomeDirection"><option value="increase">Increase</option><option value="decrease">Decrease</option></select>
+    <label for="outcomeSource">Evidence URL</label><input id="outcomeSource" type="url" placeholder="https://your-website.com/evidence">
+    <button type="button" id="outcomeSave">Record measured outcome</button>
+    <button type="button" id="outcomeLoad">View outcomes</button>
+    <div id="outcomeResults" role="status"></div>`;
   const results = document.getElementById('results');
   if (!results) return;
   // Keep the intelligence team visible above audit results, even before any audit.
@@ -85,9 +101,37 @@
     try {
       const r=await fetch('/api/intelligence/evidence',{method:'POST',headers:{'Content-Type':'application/json','X-GrowthLens-Key':key},body:JSON.stringify({website,field:$('learningField').value,value})});
       const d=await r.json(); if (!r.ok) throw Error(d.detail || 'Could not save feedback');
-      $('learningStatus').textContent='Feedback recorded as user-asserted (not independently verified). Free-host storage is temporary.';
+      $('learningStatus').textContent='Feedback recorded as user-asserted (not independently verified). Persistence: '+(d.durable?'durable':'not verified')+'.';
     } catch(e) { $('learningStatus').textContent=String(e.message); }
   };
+  const intelGet=async path=>{
+    const key=$('privateKey')?.value.trim(),website=$('url')?.value.trim();
+    if(!key||!website)throw Error('Enter the access key and website first.');
+    const res=await fetch(path+'?website='+encodeURIComponent(website),{headers:{'X-GrowthLens-Key':key}});
+    const data=await res.json();if(!res.ok)throw Error(data.detail||'Request failed');return data;
+  };
+  const showIntel=(id,data)=>{const el=$(id);el.replaceChildren();const pre=document.createElement('pre');pre.style.whiteSpace='pre-wrap';pre.style.overflowWrap='anywhere';pre.textContent=JSON.stringify(data,null,2);el.append(pre);};
+  $('neuralSearch').onclick=async()=>{try{
+    const query=$('neuralQuery').value.trim();if(query.length<2)throw Error('Enter a question.');
+    const data=await intelGet('/api/intelligence/evidence-ranking&unused=0'.replace('&unused=0','')+'&query='+encodeURIComponent(query));
+    showIntel('neuralResults',data);
+  }catch(e){$('neuralResults').textContent=String(e.message);}};
+  $('historyCompare').onclick=async()=>{try{showIntel('neuralResults',await intelGet('/api/intelligence/history-changes'));}
+    catch(e){$('neuralResults').textContent=String(e.message);}};
+  $('outcomeSave').onclick=async()=>{try{
+    const key=$('privateKey')?.value.trim(),website=$('url')?.value.trim();
+    if(!key||!website)throw Error('Enter the access key and website first.');
+    const baseline=$('outcomeBaseline').value,observed=$('outcomeObserved').value;
+    if(!baseline.trim()||!observed.trim())throw Error('Enter before and after measurements.');
+    const res=await fetch('/api/intelligence/outcomes',{method:'POST',headers:{'Content-Type':'application/json','X-GrowthLens-Key':key},
+      body:JSON.stringify({website,recommendation_id:$('outcomeId').value.trim(),metric:$('outcomeMetric').value.trim(),
+      baseline:Number(baseline),observed:Number(observed),direction:$('outcomeDirection').value,
+      source_url:$('outcomeSource').value.trim()})});
+    const data=await res.json();if(!res.ok)throw Error(JSON.stringify(data.detail||'Unable to record outcome'));
+    showIntel('outcomeResults',data);
+  }catch(e){$('outcomeResults').textContent=String(e.message);}};
+  $('outcomeLoad').onclick=async()=>{try{showIntel('outcomeResults',await intelGet('/api/intelligence/outcomes'));}
+    catch(e){$('outcomeResults').textContent=String(e.message);}};
   $('publicIntelRun').onclick = async () => {
     const key=$('privateKey')?.value.trim(), url=$('url')?.value.trim(), cik=$('publicCik').value.trim();
     if (!key || !url) { $('publicIntelStatus').textContent='Enter your access key and website URL first.'; return; }
