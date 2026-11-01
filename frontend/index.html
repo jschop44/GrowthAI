@@ -506,6 +506,7 @@ function populateReport(data) {
         "<li><strong>Priority " + (i + 1) + ": " +
         esc(f.name) + "</strong> — " +
         esc(f.recommendation) +
+        "<ol>" + (f.implementation_steps||[]).map(step=>"<li>"+esc(step)+"</li>").join("") + "</ol>" +
         " <span style='color:#647580'>(" +
         esc(f.weight) +
         "-point check)</span></li>"
