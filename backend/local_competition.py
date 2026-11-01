@@ -395,7 +395,28 @@ def register_local_routes(app, validate_url, fetch_public, robots_allowed, analy
         from backend.financial_intelligence import estimate_opportunities
         feature_gaps = [item for item in comparison if not item['target_observed'] and item['competitors_with_feature']]
         financial_scenarios = estimate_opportunities(classification.get('key'), competitors, feature_gaps)
-        return {'identity':identity,'classification':classification,'industry_recommendations':industry_recommendations(classification,response.text),'financial_scenarios':financial_scenarios,'feature_comparison':comparison,'audit':audit,'radius_miles':body.radius_miles,'location_source':location_source,'competitors':competitors,'discovery_source':discovery_source+'; coverage is incomplete, listings not independently verified','warning':warning,'opportunities':opportunities,'traffic':{'visits':None,'source':None,'status':'Not available: public HTML does not verify traffic. Connect authorized first-party analytics for verified traffic.'},'revenue':{'amount':None,'source':None,'status':'Not calculated: verified traffic, conversion rate and revenue per conversion are not available.'},'limitations':['Competitor scores are single-page technical checks, not rankings or business performance scores.','Competitor list is not exhaustive; only five competitor websites are audited per request.','Business identity and logo are extracted from website metadata and may require confirmation.','No verified traffic, leads, conversion or revenue data was provided.']}
+        memory_status={'stored':False,'persistent':False}
+        try:
+            from backend import learning_engine
+            subject='https://'+(urlparse(final).hostname or '').lower().removeprefix('www.')
+            snapshot={'source':final,'score':audit['score'],
+                      'competitor_count':len(competitors),'radius_miles':body.radius_miles,
+                      'observed_at':__import__('datetime').datetime.now(
+                          __import__('datetime').timezone.utc).isoformat(),
+                      'findings':audit.get('findings',[])[:15],
+                      'opportunities':opportunities[:10],
+                      'competitors':[{'name':c.get('name'),'website':c.get('website'),
+                                      'score':c.get('score'),'status':c.get('status')}
+                                     for c in competitors[:10]],
+                      'verification':'public_page_observed_and_third_party_discovery'}
+            saved=learning_engine.store(subject,'local_competition_audit',snapshot,verified=False)
+            memory_status={'stored':bool(saved.get('stored')),
+                           'persistent':bool(saved.get('persistent')),
+                           'storage':saved.get('storage')}
+        except Exception:
+            import logging
+            logging.getLogger('growthlens.local').exception('Local audit memory persistence failed')
+        return {'identity':identity,'classification':classification,'industry_recommendations':industry_recommendations(classification,response.text),'financial_scenarios':financial_scenarios,'feature_comparison':comparison,'audit':audit,'radius_miles':body.radius_miles,'intelligence_memory':memory_status,'location_source':location_source,'competitors':competitors,'discovery_source':discovery_source+'; coverage is incomplete, listings not independently verified','warning':warning,'opportunities':opportunities,'traffic':{'visits':None,'source':None,'status':'Not available: public HTML does not verify traffic. Connect authorized first-party analytics for verified traffic.'},'revenue':{'amount':None,'source':None,'status':'Not calculated: verified traffic, conversion rate and revenue per conversion are not available.'},'limitations':['Competitor scores are single-page technical checks, not rankings or business performance scores.','Competitor list is not exhaustive; only five competitor websites are audited per request.','Business identity and logo are extracted from website metadata and may require confirmation.','No verified traffic, leads, conversion or revenue data was provided.']}
     app.include_router(router)
     from backend.intelligence_memory import register_memory_routes
     register_memory_routes(app)
