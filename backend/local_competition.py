@@ -320,7 +320,7 @@ def register_local_routes(app, validate_url, fetch_public, robots_allowed, analy
             if lat is None: warning='No reliable physical address or coordinates found on the target website. Cannot establish the selected search radius.'
             else: candidates,warning,discovery_source=discover_competitors(client,lat,lon,classification,(urlparse(final).hostname or '').lower().removeprefix('www.'),body.radius_miles)
             from backend.comparison import observed_features, compare_features
-            target_features = observed_features(response.text, classification.get('key'))
+            target_features = observed_features(response.text, classification.get('key'),final)
             competitors=[]
             audited_count = 0
             for c in candidates:
@@ -340,7 +340,7 @@ def register_local_routes(app, validate_url, fetch_public, robots_allowed, analy
                     else:
                         started=time.monotonic();r,real=fetch_public(client,safe)
                         comp=analyze_html(r.text,real,(time.monotonic()-started)*1000)
-                        row.update(score=comp['score'],status='audited',findings=comp['findings'],website=real,features=observed_features(r.text,classification.get('key')))
+                        row.update(score=comp['score'],status='audited',findings=comp['findings'],website=real,features=observed_features(r.text,classification.get('key'),real))
                 except (httpx.HTTPError,ValueError) as exc: row['status']='unavailable: '+str(exc)[:90]
                 competitors.append(row)
         opportunities=[]
