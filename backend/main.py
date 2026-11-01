@@ -308,3 +308,6 @@ register_public_intelligence(app, validate_url)
 
 from backend.intelligence_team import register_team_routes
 register_team_routes(app, validate_url, fetch_public, robots_allowed, analyze_html)
+
+from backend.intelligence_memory import register_memory_routes
+register_memory_routes(app)
