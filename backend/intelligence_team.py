@@ -80,8 +80,16 @@ def opportunity_worker(results):
     website = results["website"]
     discovery = results["discovery"]
     if website.get("status") != "available":
+        if discovery.get("status") == "available" and discovery.get("competitors"):
+            return {"status": "available", "source": "GrowthLens opportunity engine",
+                    "recommendations": [{"issue": "Local competitive landscape",
+                        "recommendation": "Review the identified public competitor listings and verify which businesses serve the same customers.",
+                        "evidence": str(len(discovery["competitors"])) + " public listings in selected radius",
+                        "confidence": "listing-only"}],
+                    "financial_scenarios": None,
+                    "note": "No website-specific opportunities or revenue assumptions inferred from blocked content."}
         return {"status": "unavailable", "source": "GrowthLens opportunity engine",
-                "reason": "No permitted homepage observations to support recommendations"}
+                "reason": "No permitted homepage observations or usable competitor listings"}
     findings = website["audit"]["findings"]
     recommendations = [{"issue": f["name"], "recommendation": f["recommendation"],
                         "evidence": "Observed homepage technical check", "confidence": "homepage-only"}
