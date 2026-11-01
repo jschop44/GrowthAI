@@ -2,6 +2,7 @@
 import json
 import os
 from fastapi.testclient import TestClient
+from fastapi import FastAPI
 from backend import main
 from backend import local_competition as local
 
@@ -13,14 +14,16 @@ RIVAL = "<html><head><title>Nearby Roofer</title></head><body><h1>Nearby Roofer<
 def test_local_http_report_with_competitor_evidence(monkeypatch):
     monkeypatch.setenv("GROWTHLENS_PRIVATE_KEY", "testing-secret")
     monkeypatch.setattr(main.socket, "getaddrinfo", lambda *args, **kwargs: [(2, 1, 6, "", ("93.184.215.14", 0))])
-    monkeypatch.setattr(main, "robots_allowed", lambda client, url: True)
+    # Register the production route against isolated, deterministic network dependencies.
     class FakeResponse:
         def __init__(self, text):
             self.text = text
-    monkeypatch.setattr(main, "fetch_public", lambda client, url: (FakeResponse(RIVAL if "rival" in url else TARGET), url))
+    fake_fetch = lambda client, url: (FakeResponse(RIVAL if "rival" in url else TARGET), url)
     monkeypatch.setattr(local, "geocode", lambda client, identity: (39.5, -76.3, "structured data"))
     monkeypatch.setattr(local, "osm_competitors", lambda *args: ([{"name":"Nearby Roofer","website":"https://rival.example","distance_miles":2.0,"match_reason":"matching category"}],None))
-    response = TestClient(main.app).post("/api/local-competition",headers={"X-GrowthLens-Key":"testing-secret"},json={"url":"https://target.example","radius_miles":15})
+    isolated = FastAPI()
+    local.register_local_routes(isolated, lambda url: url, fake_fetch, lambda client, url: True, main.analyze_html)
+    response = TestClient(isolated).post("/api/local-competition",json={"url":"https://target.example","radius_miles":15})
     assert response.status_code == 200, response.text
     report = response.json()
     assert report["radius_miles"] == 15
