@@ -28,8 +28,8 @@
     <p id="publicIntelStatus" class="muted" role="status"></p>
     <div id="publicIntelOutput"></div>
     <div id="localOutput"></div>
-    <h3>Neural memory connection</h3>
-    <button id="memoryHealthRun" type="button">Test Neural Memory &amp; Backup</button>
+    <h3>Data protection &amp; connection</h3><p class="muted small">Connection and backup checks run automatically.</p>
+    <button id="memoryHealthRun" type="button" style="display:none">Check connection</button>
     <p id="memoryHealthStatus" class="muted" role="status"></p>
     <h3>Learning feedback (optional)</h3>
     <p class="muted small">Save a correction or observation. User feedback is not independently verified; durable storage is checked separately.</p>
@@ -42,13 +42,13 @@
     <button type="button" id="neuralSearch">Search evidence</button>
     <button type="button" id="historyCompare">Compare historical audits</button>
     <div id="neuralResults" role="status"></div>
-    <h3>Measure recommendation results</h3>
+    <h3>Recommendation progress</h3><p class="muted small">Audit scores are measured and saved automatically. Optionally record actual business results below.</p>
     <label for="outcomeId">Recommendation ID</label><input id="outcomeId" maxlength="120" placeholder="e.g. improve-mobile-speed">
     <label for="outcomeMetric">Metric</label><input id="outcomeMetric" maxlength="80" placeholder="e.g. Mobile performance score">
     <label for="outcomeBaseline">Before</label><input id="outcomeBaseline" type="number" step="any">
     <label for="outcomeObserved">After</label><input id="outcomeObserved" type="number" step="any">
     <label for="outcomeDirection">Desired direction</label><select id="outcomeDirection"><option value="increase">Increase</option><option value="decrease">Decrease</option></select>
-    <label for="outcomeSource">Evidence URL</label><input id="outcomeSource" type="url" placeholder="https://your-website.com/evidence">
+    <label for="outcomeSource">Page showing this result (optional)</label><input id="outcomeSource" type="url" placeholder="Automatically uses the audited website">
     <button type="button" id="outcomeSave">Record measured outcome</button>
     <button type="button" id="outcomeLoad">View outcomes</button>
     <div id="outcomeResults" role="status"></div>`;
@@ -87,14 +87,18 @@
       const r=await fetch('/api/intelligence/memory-health',{headers:{'X-GrowthLens-Key':key}});
       const d=await r.json();
       if(!r.ok)throw Error(d.detail||'Connection test failed');
-      $('memoryHealthStatus').textContent=
-        'Qdrant: '+(d.qdrant_write_and_read_verified?'verified persistent read/write':d.qdrant_configured?'configured; read/write not verified':'not configured')+
-        '. Embeddings: '+(d.neural_inference_verified?'Qdrant neural inference verified':d.free_embedding_fallback?'free deterministic fallback':'not verified')+
-        '. PostgreSQL backup: '+(d.postgres_backup_read_verified?'verified write and recovery':d.postgres_backup_write_verified?'write verified; recovery not verified':d.postgres_backup_configured?'configured; write failed':'not configured')+
-        '. Overall: '+d.status+'. '+Object.entries(d.provider_diagnostics||{}).map(([name,info])=>name+': '+(info.http_status?'HTTP '+info.http_status:info.error_type||'not configured')).join('; ')+'.';
+      $('memoryHealthStatus').textContent=d.status==='fully_connected'
+        ?'Connected and protected. Website intelligence and backups are working.'
+        :'Some storage checks need attention. Automatic monitoring will retry.';
     }catch(e){$('memoryHealthStatus').textContent=String(e.message);}
     finally{$('memoryHealthRun').disabled=false;}
   };
+  // Check in the background when the access key is available.
+  let lastHealthKey='';
+  const autoHealth=()=>{const key=$('privateKey')?.value.trim();if(key && key!==lastHealthKey){lastHealthKey=key;$('memoryHealthRun').click();}};
+  $('privateKey')?.addEventListener('change',autoHealth);
+  setInterval(()=>{lastHealthKey='';autoHealth();},30*60*1000);
+  autoHealth();
   $('learningSave').onclick = async () => {
     const key=$('privateKey')?.value.trim(), website=$('url')?.value.trim(), value=$('learningValue').value.trim();
     if (!key || !website || !value) { $('learningStatus').textContent='Enter the access key, website, and feedback.'; return; }
@@ -160,7 +164,7 @@
     const res=await fetch('/api/intelligence/outcomes',{method:'POST',headers:{'Content-Type':'application/json','X-GrowthLens-Key':key},
       body:JSON.stringify({website,recommendation_id:$('outcomeId').value.trim(),metric:$('outcomeMetric').value.trim(),
       baseline:Number(baseline),observed:Number(observed),direction:$('outcomeDirection').value,
-      source_url:$('outcomeSource').value.trim()})});
+      source_url:($('outcomeSource').value.trim()||website)})});
     const data=await res.json();if(!res.ok)throw Error(JSON.stringify(data.detail||'Unable to record outcome'));
     showIntel('outcomeResults',data);
   }catch(e){$('outcomeResults').textContent=String(e.message);}};
