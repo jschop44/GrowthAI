@@ -19,3 +19,5 @@ jobs:
       - run: PYTHONPATH=. python -m pytest -q tests
       - run: python -m compileall -q backend
       - run: node --check frontend/local-competition.js
+      - run: docker build -t growthlens-validation .
+      - run: python -c "from backend.main import app; assert any(getattr(r, 'path', '') == '/api/local-competition' for r in app.routes); assert any(getattr(r, 'path', '') == '/api/health' for r in app.routes)"
