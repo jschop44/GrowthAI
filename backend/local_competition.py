@@ -6,6 +6,7 @@ import time
 from urllib.parse import urljoin, urlparse
 
 import httpx
+from backend.providers import geoapify_geocode, geoapify_places
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -139,6 +140,8 @@ def extract_address_from_page(html, identity):
 def geocode(client, identity):
     if identity['latitude'] is not None: return identity['latitude'],identity['longitude'],'website structured data'
     if not identity['address']: return None,None,None
+    geo_result = geoapify_geocode(client, identity['address'])
+    if geo_result is not None: return geo_result
     try:
         r=client.get('https://nominatim.openstreetmap.org/search',params={'q':identity['address'],'format':'json','limit':1},headers=OSM_HEADERS,timeout=12)
         r.raise_for_status()
@@ -227,6 +230,50 @@ def osm_competitors(client, lat, lon, classification, host, radius_miles):
     return candidates[:20], warning
 
 
+
+def discover_competitors(client, lat, lon, classification, host, radius_miles):
+    """Geoapify when configured; Overpass otherwise. Both are OSM-derived data."""
+    raw, provider_warning = geoapify_places(client, lat, lon, classification, radius_miles)
+    if raw is None:
+        candidates, osm_warning = osm_competitors(client, lat, lon, classification, host, radius_miles)
+        provenance = "OpenStreetMap contributors via Overpass API (Geoapify not configured or unavailable)"
+        return candidates, osm_warning, provenance
+    candidates, seen = [], set()
+    key = classification.get('key')
+    for row in raw:
+        name = str(row.get('name') or '').strip()
+        if not name: continue
+        name_lower = name.lower()
+        # Broad service category does not prove a specialty.
+        if key in ('roofing', 'plumber', 'hvac'):
+            specialty = {'roofing': ('roof',), 'plumber': ('plumb', 'drain', 'pipe'),
+                         'hvac': ('hvac', 'heating', 'cooling', 'air conditioning')}
+            if not any(term in name_lower for term in specialty[key]):
+                continue
+        if key == 'pizza' and not any(t in name_lower for t in ('pizza','pizzeria')):
+            categories = ' '.join(row.get('categories') or []).lower()
+            if 'pizza' not in categories: continue
+        website=row.get('website')
+        hostname = ((urlparse(website).hostname or '').lower().removeprefix('www.') if website else '')
+        if hostname and hostname == host: continue
+        identifier = hostname or row.get('provider_id') or name_lower
+        if identifier in seen: continue
+        try: distance = haversine(lat,lon,row['lat'],row['lon'])
+        except (KeyError, TypeError, ValueError): continue
+        if distance > radius_miles: continue
+        seen.add(identifier)
+        candidates.append({
+            'name':name[:120], 'website': website,'distance_miles':round(distance,1),
+            'provider':'Geoapify (OpenStreetMap-derived)', 'provider_id':row.get('provider_id'),
+            'source_url':row.get('source_url'),
+            'match_reason':'Provider category and name-based specialty filter; verify manually',
+        })
+    candidates.sort(key=lambda x:(x['distance_miles'],x['name']))
+    if candidates:
+        return candidates[:20],None,'Geoapify places (OpenStreetMap-derived)'
+    fallback,osm_warning = osm_competitors(client,lat,lon,classification,host,radius_miles)
+    return fallback,osm_warning or provider_warning,'OpenStreetMap via Overpass (Geoapify yielded no reliable matches)'
+
 def industry_recommendations(classification, html):
     """Evidence-limited, industry-specific checks; absence on homepage is not absence on entire site."""
     industry = classification.get('key') or classification.get('industry') or ''
@@ -269,9 +316,9 @@ def register_local_routes(app, validate_url, fetch_public, robots_allowed, analy
                 identity['longitude'] = None
                 identity['address_source'] = 'user supplied (not independently verified)'
             lat,lon,location_source=geocode(client,identity)
-            candidates=[];warning=None
+            candidates=[];warning=None;discovery_source='No discovery performed'
             if lat is None: warning='No reliable physical address or coordinates found on the target website. Cannot establish the selected search radius.'
-            else: candidates,warning=osm_competitors(client,lat,lon,classification,(urlparse(final).hostname or '').lower().removeprefix('www.'),body.radius_miles)
+            else: candidates,warning,discovery_source=discover_competitors(client,lat,lon,classification,(urlparse(final).hostname or '').lower().removeprefix('www.'),body.radius_miles)
             from backend.comparison import observed_features, compare_features
             target_features = observed_features(response.text, classification.get('key'))
             competitors=[]
@@ -279,7 +326,7 @@ def register_local_routes(app, validate_url, fetch_public, robots_allowed, analy
             for c in candidates:
                 row={**c,'score':None,'status':'not audited','scoring_scope':audit['scoring_scope'],'findings':[]}
                 if not c.get('website'):
-                    row['status'] = 'No public website listed in OpenStreetMap'
+                    row['status'] = 'No public website listed by data provider'
                     competitors.append(row)
                     continue
                 if audited_count >= 5:
@@ -304,7 +351,7 @@ def register_local_routes(app, validate_url, fetch_public, robots_allowed, analy
         from backend.financial_intelligence import estimate_opportunities
         feature_gaps = [item for item in comparison if not item['target_observed'] and item['competitors_with_feature']]
         financial_scenarios = estimate_opportunities(classification.get('key'), competitors, feature_gaps)
-        return {'identity':identity,'classification':classification,'industry_recommendations':industry_recommendations(classification,response.text),'financial_scenarios':financial_scenarios,'feature_comparison':comparison,'audit':audit,'radius_miles':body.radius_miles,'location_source':location_source,'competitors':competitors,'discovery_source':'OpenStreetMap contributors via Overpass API; business-category and specialty matching, including listings without websites; coverage is incomplete','warning':warning,'opportunities':opportunities,'traffic':{'visits':None,'source':None,'status':'Not available: public HTML does not verify traffic. Connect authorized first-party analytics for verified traffic.'},'revenue':{'amount':None,'source':None,'status':'Not calculated: verified traffic, conversion rate and revenue per conversion are not available.'},'limitations':['Competitor scores are single-page technical checks, not rankings or business performance scores.','Competitor list is not exhaustive; only five competitor websites are audited per request.','Business identity and logo are extracted from website metadata and may require confirmation.','No verified traffic, leads, conversion or revenue data was provided.']}
+        return {'identity':identity,'classification':classification,'industry_recommendations':industry_recommendations(classification,response.text),'financial_scenarios':financial_scenarios,'feature_comparison':comparison,'audit':audit,'radius_miles':body.radius_miles,'location_source':location_source,'competitors':competitors,'discovery_source':discovery_source+'; coverage is incomplete, listings not independently verified','warning':warning,'opportunities':opportunities,'traffic':{'visits':None,'source':None,'status':'Not available: public HTML does not verify traffic. Connect authorized first-party analytics for verified traffic.'},'revenue':{'amount':None,'source':None,'status':'Not calculated: verified traffic, conversion rate and revenue per conversion are not available.'},'limitations':['Competitor scores are single-page technical checks, not rankings or business performance scores.','Competitor list is not exhaustive; only five competitor websites are audited per request.','Business identity and logo are extracted from website metadata and may require confirmation.','No verified traffic, leads, conversion or revenue data was provided.']}
     app.include_router(router)
     from backend.intelligence_memory import register_memory_routes
     register_memory_routes(app)
