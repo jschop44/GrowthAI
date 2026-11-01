@@ -562,6 +562,7 @@ function render(data, createdAt = null) {
   const renderFinding=f=>{
     const finance=f.financial_scenario;
     const estimate=finance?money(finance.implementation_cost_usd.low)+"–"+money(finance.implementation_cost_usd.high):"";
+    const scenario=finance?"<p class=financial>Illustrative implementation cost: "+esc(estimate)+". Hypothetical annual additional sales: "+esc(money(finance.annual_incremental_revenue_usd))+". Not a forecast; site traffic and conversion changes were not measured.</p>":"";
     const steps=(f.implementation_steps||[]).map(step=>'<li>'+esc(step)+'</li>').join('');
     return "<article class='finding'><strong class='"+(f.passed?"ok":"bad")+"'>"+
       (f.passed?"✓ ":"Needs attention · ")+esc(f.name)+"</strong>"+
