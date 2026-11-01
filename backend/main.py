@@ -62,6 +62,43 @@ init_db()
 class AuditRequest(BaseModel):
     url: str = Field(min_length=4, max_length=2048)
 
+
+class BusinessLookupRequest(BaseModel):
+    query: str = Field(min_length=2, max_length=180)
+
+@app.post('/api/business-lookup')
+def business_lookup(body: BusinessLookupRequest):
+    """Resolve public business listings without guessing their websites."""
+    query=body.query.strip()
+    if re.search(r'https?://|(?:[a-z0-9-]+\.)+[a-z]{2,}',query,re.I):
+        try:
+            return {'status':'url','url':validate_url(query),'matches':[]}
+        except ValueError as exc:
+            raise HTTPException(422,str(exc))
+    try:
+        with httpx.Client(timeout=12,trust_env=False) as client:
+            response=client.get('https://nominatim.openstreetmap.org/search',
+                params={'q':query,'format':'json','addressdetails':1,'extratags':1,'limit':8},
+                headers={'User-Agent':AGENT,'Accept':'application/json'})
+            response.raise_for_status()
+            matches=[]
+            for item in response.json():
+                tags=item.get('extratags') or {}
+                candidate=tags.get('website') or tags.get('contact:website') or tags.get('url')
+                if not candidate:
+                    continue
+                try:
+                    website=validate_url(candidate)
+                except (ValueError,TypeError):
+                    continue
+                matches.append({'name':item.get('name') or item.get('display_name','').split(',')[0],
+                                'address':item.get('display_name',''),
+                                'website':website,'source':'OpenStreetMap business listing'})
+            return {'status':'matches' if matches else 'not_found','matches':matches,
+                    'note':'Select the correct listing. Public directory information may be outdated.'}
+    except (httpx.HTTPError,ValueError):
+        raise HTTPException(503,'Business directory lookup is temporarily unavailable.')
+
 class RevenueScenario(BaseModel):
     monthly_visits: int = Field(ge=0, le=100000000)
     conversion_rate_percent: float = Field(ge=0, le=100)
