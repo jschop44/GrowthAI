@@ -110,7 +110,41 @@
     const res=await fetch(path+(path.includes('?')?'&':'?')+'website='+encodeURIComponent(website),{headers:{'X-GrowthLens-Key':key}});
     const data=await res.json();if(!res.ok)throw Error(data.detail||'Request failed');return data;
   };
-  const showIntel=(id,data)=>{const el=$(id);el.replaceChildren();const pre=document.createElement('pre');pre.style.whiteSpace='pre-wrap';pre.style.overflowWrap='anywhere';pre.textContent=JSON.stringify(data,null,2);el.append(pre);};
+  // Human-readable results only. Evidence is persisted server-side automatically.
+  const showIntel=(id,data)=>{
+    const el=$(id);el.replaceChildren();
+    const add=(tag,value,parent=el)=>{const node=document.createElement(tag);node.textContent=String(value??'');parent.append(node);return node;};
+    const card=(heading)=>{const section=document.createElement('section');section.style.cssText='padding:14px;margin:12px 0;border:1px solid #45616b;border-radius:10px';add('h4',heading,section);el.append(section);return section;};
+    if(data.status==='available' && Array.isArray(data.results)){
+      add('h3',data.results.length?'Saved website evidence':'No saved evidence yet');
+      if(!data.results.length){add('p','Complete a new website or competitor audit to automatically build your evidence library. No copying or manual saving is needed.');return;}
+      data.results.forEach((item,i)=>{
+        const evidence=item.evidence||{},section=card((evidence.title||evidence.company_name||item.kind||'Audit evidence')+' · '+(i+1));
+        add('p','Source: '+(item.source||evidence.source||'Website audit'),section);
+        if(typeof evidence.score==='number')add('p','Website audit score: '+evidence.score+'/100',section);
+        add('p',item.verified?'Observed from the public website':'Reported or third-party information — not independently verified',section);
+        const failed=(evidence.findings||[]).filter(f=>f.passed===false).slice(0,5);
+        if(failed.length){add('strong','Recommended improvements',section);const ul=document.createElement('ul');failed.forEach(f=>add('li',f.recommendation||f.name||f.id,ul));section.append(ul);}
+        (evidence.opportunities||[]).slice(0,4).forEach(o=>add('p',o.recommendation||o.issue,section));
+      });return;
+    }
+    if(Array.isArray(data.changes)){
+      add('h3',data.changes.length?'Changes between audits':'No changes to compare yet');
+      if(!data.changes.length){add('p',data.observations_examined<2?'Complete at least two audits of this website to compare results.':'No measurable changes were found between the saved audits.');return;}
+      data.changes.forEach(c=>{const section=card(String(c.field||'Measurement').replace(/_/g,' '));add('p','Previous: '+c.before+'  →  Latest: '+c.after,section);add('p',c.independently_verified?'Verified source observations':'Comparison of recorded observations',section);});return;
+    }
+    if(Array.isArray(data.outcomes)){
+      add('h3',data.outcomes.length?'Recorded recommendation outcomes':'No recommendation outcomes recorded yet');
+      data.outcomes.forEach(o=>{const d=o.data||o,section=card(d.metric||d.recommendation_id||'Outcome');add('p','Before: '+d.baseline+'  →  After: '+d.observed,section);add('p',d.verification==='user_asserted'?'User-reported measurement':'Recorded measurement',section);});return;
+    }
+    if(data.status==='recorded'||Object.hasOwn(data,'improved')){
+      add('h3','Recommendation result saved');
+      add('p',data.persistent?'Saved to persistent intelligence memory.':'Received, but durable storage has not been confirmed.');
+      add('p',data.improved?'The reported measurement improved.':'No improvement was reported for this measurement.');
+      add('small','Results are user-reported and do not prove causation.');return;
+    }
+    add('p',data.note||data.message||'No results available yet.');
+  };
   $('neuralSearch').onclick=async()=>{try{
     const query=$('neuralQuery').value.trim();if(query.length<2)throw Error('Enter a question.');
     const data=await intelGet('/api/intelligence/evidence-ranking?query='+encodeURIComponent(query));
