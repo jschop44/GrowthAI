@@ -219,3 +219,47 @@ def evaluation_summary(subject):
     observations=result.get("observations",[])
     verified=sum(1 for item in observations if item.get("verified") is True)
     return {"subject":subject,"observations_examined":len(observations),"verified_evidence":verified,"unverified_evidence":len(observations)-verified,"eligible_for_evaluated_recommendations":verified,"model_version":MODEL,"storage":result.get("storage"),"automatic_retraining":False}
+
+def compare_history(subject,limit=25):
+    """Compare source-attributed snapshots; never infer missing values."""
+    observations=recall(subject,limit).get("observations",[])
+    by_kind={}
+    for item in observations:
+        if not isinstance(item,dict) or item.get("kind")=="connection_test":continue
+        data=item.get("data") or {}
+        if not isinstance(data,dict) or not data.get("source"):continue
+        by_kind.setdefault(item.get("kind","unknown"),[]).append(item)
+    changes=[]
+    for kind,records in by_kind.items():
+        records=sorted(records,key=lambda r:(r.get("recorded",0),r.get("id","")))
+        if len(records)<2:continue
+        older,newer=records[-2:]
+        before,after=older.get("data",{}),newer.get("data",{})
+        for field in ("score","performance_score","competitor_count","radius_miles","company_name"):
+            a,b=before.get(field),after.get(field)
+            if a is not None and b is not None and a!=b:
+                changes.append({"engine":kind,"field":field,"before":a,"after":b,
+                                "source_before":before.get("source"),"source_after":after.get("source"),
+                                "independently_verified":bool(older.get("verified") and newer.get("verified"))})
+    return {"subject":subject,"changes":changes,"observations_examined":len(observations),
+            "note":"Changes reflect recorded source observations, not necessarily independently confirmed real-world changes."}
+
+def rank_evidence(query,subject,limit=8):
+    """Neural retrieval ranking with explicit provenance and verification gates."""
+    found=semantic_search(query,subject=subject,limit=limit)
+    if found.get("status")!="available":return found
+    ranked=[]
+    for hit in found["results"]:
+        record=hit.get("record") or {}
+        data=record.get("data") or {}
+        if not isinstance(data,dict) or not data.get("source"):continue
+        score=hit.get("score")
+        if not isinstance(score,(int,float)):continue
+        ranked.append({"semantic_score":round(float(score),4),
+                       "verified":record.get("verified") is True,
+                       "source":data.get("source"),"kind":record.get("kind"),
+                       "recorded":record.get("recorded"),"model_version":record.get("embedding_model") or record.get("model_version"),
+                       "evidence":data})
+    ranked.sort(key=lambda x:(x["verified"],x["semantic_score"]),reverse=True)
+    return {"status":"available","results":ranked,"model":MODEL,
+            "note":"Verified evidence ranks first; similarity is not a factual confidence score."}
