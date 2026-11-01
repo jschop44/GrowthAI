@@ -31,7 +31,7 @@
   results.parentNode.insertBefore(panel, results.nextSibling);
   const style = document.createElement('style');
   style.textContent = `
-    #localCompetition table{width:100%;border-collapse:collapse;font-size:13px}
+    #localOutput{max-width:100%;overflow-x:auto;overflow-wrap:anywhere}\n    #localCompetition table{width:100%;border-collapse:collapse;font-size:13px}
     #localCompetition th,#localCompetition td{padding:9px;text-align:left;border-bottom:1px solid #34515b;vertical-align:top}
     #localCompetition img{max-height:60px;max-width:160px;object-fit:contain;background:white;padding:5px;border-radius:6px}
     #localCompetition .localNote{font-size:12px;opacity:.85}
@@ -79,21 +79,30 @@
       const rivals=data.competitors.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.distance_miles)} mi</td><td>${c.score===null?'N/A':esc(c.score)+'/100'}</td><td>${c.website ? `<a href="${esc(c.website)}" target="_blank" rel="noopener noreferrer">Website</a>` : "Not listed"}</td><td>${esc(c.status)}</td></tr>`).join('');
       const actions=data.opportunities.slice(0,8).map(o=>`<li><strong>${esc(o.issue)}:</strong> ${esc(o.recommendation)} ${o.competitors_passing_check.length?'<span class="localNote">Competitors passing: '+esc(o.competitors_passing_check.join(', '))+'</span>':''}</li>`).join('');
       $('localOutput').innerHTML=`
-        <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:15px 0">${logo}<div><h3 style="margin:0">${esc(company.name)}</h3><p class="muted" style="margin:5px 0">${esc(company.address||'Physical address not detected')} Â· ${esc(company.name_source)}</p></div></div>
-        <p><strong>Detected business type:</strong> ${esc(data.classification?.label || 'Unknown')} Â· <strong>Confidence:</strong> ${esc(data.classification?.confidence || 'unknown')}</p>
+        <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:15px 0">${logo}<div><h3 style="margin:0">${esc(company.name)}</h3><p class="muted" style="margin:5px 0">${esc(company.address||'Physical address not detected')} · ${esc(company.name_source)}</p></div></div>
+        <p><strong>Detected business type:</strong> ${esc(data.classification?.label || 'Unknown')} · <strong>Confidence:</strong> ${esc(data.classification?.confidence || 'unknown')}</p>
         <p class="localNote"><strong>Classification evidence:</strong> ${(data.classification?.evidence || []).map(e => esc(e.source) + ' (' + esc((e.matched_terms || []).join(', ')) + ')').join('; ') || 'Insufficient evidence'}</p>
-        <p><strong>Location source:</strong> ${esc(data.location_source || "Not established")} ${company.address ? `Â· ${esc(company.address)}` : ""}</p>
-        <p><strong>Target technical score:</strong> ${esc(data.audit.score)}/100 Â· <strong>Radius:</strong> ${esc(data.radius_miles)} miles</p>
+        <p><strong>Location source:</strong> ${esc(data.location_source || "Not established")} ${company.address ? `· ${esc(company.address)}` : ""}</p>
+        <p><strong>Target technical score:</strong> ${esc(data.audit.score)}/100 · <strong>Radius:</strong> ${esc(data.radius_miles)} miles</p>
         ${data.warning?'<p class="bad">'+esc(data.warning)+'</p>':''}
         <h3>Nearby competitors (${data.competitors.length} found in public listings)</h3>
         <table><thead><tr><th>Business</th><th>Distance</th><th>Technical score</th><th>Source website</th><th>Audit status</th></tr></thead><tbody>${rivals||'<tr><td colspan="5">No matching competitors were found in available public listings.</td></tr>'}</tbody></table>
         <p class="localNote">${esc(data.discovery_source)}. All scores use the same single-page technical checklist. N/A is not zero.</p>
         <h3>Industry-specific opportunities</h3><ol>${(data.industry_recommendations||[]).map(x=>`<li><strong>${esc(x.issue)}:</strong> ${esc(x.recommendation)} <span class="localNote">${esc(x.evidence)}</span></li>`).join('') || '<li>No additional homepage-specific signals identified.</li>'}</ol>
         <h3>Business-specific action plan</h3><ol>${actions||'<li>No failed technical checks were identified on the target page.</li>'}</ol>
-        <h3>Traffic and revenue evidence</h3><p><strong>Verified visits:</strong> Unavailable. ${esc(data.traffic.status)}</p><p><strong>Verified revenue opportunity:</strong> Unavailable. ${esc(data.revenue.status)}</p>
+        <h3>Observed competitor capabilities</h3>
+        <p class="localNote">Homepage evidence only; absence is not established.</p>
+        <ul>${(data.feature_comparison||[]).map(x=>"<li>"+esc(x.feature)+": target "+(x.target_observed?"observed":"not observed")+"; competitors observed: "+esc(x.competitors_with_feature.join(", ")||"none")+"</li>").join("")}</ul>
+        <h3>Automatic financial scenarios</h3>
+        <p class="localNote">Hypothetical opportunity ranges only, NOT verified lost revenue. Very low confidence; do not add scenarios together.</p>
+        <ul>${(data.financial_scenarios?.opportunities||[]).map(x=>"<li>"+esc(x.feature)+": annual illustrative revenue range $"+Number(x.annual_revenue_scenarios.conservative).toLocaleString()+" to $"+Number(x.annual_revenue_scenarios.optimistic).toLocaleString()+"; baseline $"+Number(x.annual_revenue_scenarios.baseline).toLocaleString()+"; based on hypothetical conversion lift and transaction values, not measured sales.</li>").join("")||"<li>No modeled opportunities with observed competitor evidence.</li>"}</ul>
+        <h3>Traffic and revenue evidence</h3>
+        <p><strong>Verified visits:</strong> Unavailable. ${esc(data.traffic.status)}</p>
+        <p><strong>Verified revenue opportunity:</strong> Unavailable. ${esc(data.revenue.status)}</p>
         <p class="localNote">${esc(data.limitations.join(' '))}</p>`;
+      panel.dispatchEvent(new CustomEvent('growthlens:report', {detail:data}));
       $('localStatus').textContent=`Local ${data.radius_miles}-mile analysis complete. You can print this section with the main report.`;
     } catch(e) { $('localStatus').textContent=e.message; }
     finally { $('localRun').disabled=false; }
   };
-})();
+})()
