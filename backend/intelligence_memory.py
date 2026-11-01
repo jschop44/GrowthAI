@@ -137,7 +137,7 @@ def register_memory_routes(app):
         # This endpoint is protected by the same private API middleware as other /api/intelligence routes.
         qdrant_configured = learning_engine.config() is not None
         vector, mode = learning_engine.vectorize('GrowthLens memory connection test')
-        subject = 'growthlens:connection-test'
+        subject = 'growthlens:connection-test:' + __import__('uuid').uuid4().hex
         outcome = learning_engine.store(subject, 'connection_test',
             {'source': 'GrowthLens internal connection diagnostic', 'purpose': 'verify storage and retrieval'}, verified=False)
         retrieved = learning_engine.recall(subject, limit=25)
