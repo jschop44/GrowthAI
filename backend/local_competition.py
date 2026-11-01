@@ -240,12 +240,12 @@ def discover_competitors(client, lat, lon, classification, host, radius_miles):
     Sources share OpenStreetMap ancestry, so agreement is corroboration of
     listing identity, not independent validation of the real-world business.
     """
+    # httpx.Client supports concurrent requests; reuse the injected client so
+    # test doubles and caller-level transport settings are respected.
     def geo_task():
-        with httpx.Client(trust_env=False) as geo_client:
-            return geoapify_places(geo_client, lat, lon, classification, radius_miles)
+        return geoapify_places(client, lat, lon, classification, radius_miles)
     def osm_task():
-        with httpx.Client(trust_env=False) as osm_client:
-            return osm_competitors(osm_client, lat, lon, classification, host, radius_miles)
+        return osm_competitors(client, lat, lon, classification, host, radius_miles)
     with ThreadPoolExecutor(max_workers=2) as executor:
         geo_future = executor.submit(geo_task)
         osm_future = executor.submit(osm_task)
