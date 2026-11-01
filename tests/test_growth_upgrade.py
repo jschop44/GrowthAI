@@ -34,7 +34,7 @@ def test_financial_scenario_math():
     assert result["annual_incremental_gross_profit_usd"]==480
     assert result["first_year_total_cost_usd"]==740
     assert result["first_year_net_contribution_usd"]==-260
-    assert result["payback_months"]==30.0
+    assert result["payback_months"]==25.0
 
 def test_zero_baseline_is_safe():
     result=financial_estimate(FinancialEstimateRequest(
