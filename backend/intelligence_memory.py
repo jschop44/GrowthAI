@@ -136,7 +136,6 @@ def register_memory_routes(app):
     def memory_health():
         # This endpoint is protected by the same private API middleware as other /api/intelligence routes.
         qdrant_configured = learning_engine.config() is not None
-        hf_configured = bool(os.getenv('HF_TOKEN', '').strip())
         vector, mode = learning_engine.vectorize('GrowthLens memory connection test')
         subject = 'growthlens:connection-test'
         outcome = learning_engine.store(subject, 'connection_test',
@@ -151,7 +150,7 @@ def register_memory_routes(app):
                 'postgres_backup_write_verified':outcome.get('postgres_backup',False),
                 'postgres_backup_read_verified':backup_read_verified,
                 'qdrant_configured': qdrant_configured, 'qdrant_write_and_read_verified': persisted,
-                'hugging_face_configured': hf_configured, 'neural_inference_verified': outcome.get('embedding') == 'neural',
+                'neural_inference_verified': outcome.get('embedding') == 'neural',
                 'embedding_mode': outcome.get('embedding'), 'free_embedding_fallback': outcome.get('embedding') == 'deterministic', 'memory_storage': retrieved.get('storage'),
                 'provider_diagnostics': learning_engine.diagnose_providers(),
                 'status': 'fully_connected' if persisted and outcome.get('embedding') == 'neural' else 'persistent_free_memory_active' if persisted else 'partial',
