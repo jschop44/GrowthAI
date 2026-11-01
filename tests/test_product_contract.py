@@ -4,12 +4,12 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def test_premium_interactive_features_exist():
     script=(ROOT/'frontend'/'local-premium.js').read_text()
-    for marker in ('glVisits','glConversion','glValue','glUplift','glCost','glDelay',
-                   'Business explorer','Evidence-linked feature comparison',
+    for marker in ('Business explorer','Evidence-linked feature comparison',
                    'Prioritized opportunity playbooks','Measure success:',
-                   'Not a verified loss','No competitor financial performance was measured',
-                   'Number.isFinite','growthlens:report'):
+                   'growthlens:report'):
         assert marker in script
+    assert 'Financial what-if simulator' not in script
+    assert 'glVisits' not in script
 
 def test_only_one_local_panel_script_and_premium_script():
     html=(ROOT/'frontend'/'index.html').read_text()
