@@ -8,6 +8,7 @@ import sqlite3
 import time
 import uuid
 import httpx
+import psycopg
 
 COLLECTION="growthlens_memory_v1"
 DIM=384
@@ -97,6 +98,27 @@ def neural_recall(subject,limit=12):
     except (httpx.HTTPError,ValueError,KeyError,TypeError):
         return None
 
+def backup_write(record):
+    dsn=os.getenv("DATABASE_URL","").strip() or os.getenv("NEON_DATABASE_URL","").strip()
+    if not dsn:return False
+    try:
+        with psycopg.connect(dsn,connect_timeout=5) as db:
+            db.execute("CREATE TABLE IF NOT EXISTS growthlens_evidence_backup (id TEXT PRIMARY KEY, subject TEXT NOT NULL, kind TEXT NOT NULL, payload JSONB NOT NULL, recorded BIGINT NOT NULL, verified BOOLEAN NOT NULL)")
+            db.execute("INSERT INTO growthlens_evidence_backup VALUES (%s,%s,%s,%s::jsonb,%s,%s) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload,recorded=EXCLUDED.recorded,verified=EXCLUDED.verified",(record["id"],record["subject"],record["kind"],json.dumps(record),record["recorded"],record["verified"]))
+        return True
+    except (psycopg.Error,ValueError):
+        return False
+
+def backup_read(subject,limit):
+    dsn=os.getenv("DATABASE_URL","").strip() or os.getenv("NEON_DATABASE_URL","").strip()
+    if not dsn:return None
+    try:
+        with psycopg.connect(dsn,connect_timeout=5) as db:
+            rows=db.execute("SELECT payload FROM growthlens_evidence_backup WHERE subject=%s ORDER BY recorded DESC LIMIT %s",(subject,min(limit,25))).fetchall()
+        return [x[0] for x in rows]
+    except (psycopg.Error,ValueError):
+        return None
+
 def local():
     path=os.getenv("GROWTHLENS_MEMORY_DB") or os.getenv("GROWTHLENS_DB") or "/tmp/growthlens_learning.sqlite3"
     db=sqlite3.connect(path,timeout=5)
@@ -129,6 +151,7 @@ def store(subject,kind,data,verified=False):
             remote=True
         except (httpx.HTTPError,ValueError):
             pass
+    backed_up=backup_write(record)
     cached=False
     try:
         with local() as db:
@@ -136,7 +159,7 @@ def store(subject,kind,data,verified=False):
         cached=True
     except sqlite3.Error:
         pass
-    return {"stored":neural or remote or cached,"persistent":neural or remote,"embedding":mode,"storage":"qdrant_neural" if neural else "qdrant" if remote else "ephemeral" if cached else "unavailable","neural_status":"active" if neural else neural_reason}
+    return {"stored":neural or remote or backed_up or cached,"persistent":neural or remote or backed_up,"embedding":mode,"storage":"qdrant_neural" if neural else "qdrant" if remote else "postgres" if backed_up else "ephemeral" if cached else "unavailable","postgres_backup":backed_up,"neural_status":"active" if neural else neural_reason}
 
 def recall(subject,limit=12):
     neural=neural_recall(subject,limit)
@@ -151,6 +174,8 @@ def recall(subject,limit=12):
             return {"storage":"qdrant","observations":[x["payload"] for x in r.json()["result"]["points"]]}
         except (httpx.HTTPError,ValueError,KeyError,TypeError):
             pass
+    backup=backup_read(subject,limit)
+    if backup is not None:return {"storage":"postgres","observations":backup}
     try:
         with local() as db:
             rows=db.execute("SELECT id,kind,data,recorded,verified FROM learned_observations WHERE subject=? ORDER BY recorded DESC LIMIT ?",(subject,min(limit,25))).fetchall()
