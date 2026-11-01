@@ -141,7 +141,7 @@ def store(subject,kind,data,verified=False):
 
 def recall(subject,limit=12):
     neural=neural_recall(subject,limit)
-    if neural is not None:return {"storage":"qdrant_neural","observations":neural}
+    if neural:return {"storage":"qdrant_neural","observations":neural}
     cfg=config()
     if cfg:
         url,headers=cfg
@@ -149,7 +149,8 @@ def recall(subject,limit=12):
             with httpx.Client(timeout=9,trust_env=False) as client:
                 r=client.post(url+"/collections/"+COLLECTION+"/points/scroll",headers=headers,json={"filter":{"must":[{"key":"subject","match":{"value":subject}}]},"limit":min(limit,25),"with_payload":True,"with_vector":False})
                 r.raise_for_status()
-            return {"storage":"qdrant","observations":[x["payload"] for x in r.json()["result"]["points"]]}
+            observations=[x["payload"] for x in r.json()["result"]["points"]]
+            if observations:return {"storage":"qdrant","observations":observations}
         except (httpx.HTTPError,ValueError,KeyError,TypeError):
             pass
     backup=backup_read(subject,limit)
