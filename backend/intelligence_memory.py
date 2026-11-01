@@ -46,12 +46,16 @@ class OutcomeInput(BaseModel):
     metric: str = Field(min_length=2,max_length=80)
     baseline: float
     observed: float
-    direction: str = Field(pattern=r'^(increase|decrease)
-    raw = website if '://' in website else 'https://' + website
+    direction: str = Field(pattern="^(increase|decrease)$")
+    source_url: str = Field(min_length=8,max_length=2048)
+    note: str = Field(default="",max_length=300)
+
+def domain_for(website):
+    raw = website if "://" in website else "https://" + website
     p = urlparse(raw)
-    if p.scheme not in ('http', 'https') or not p.hostname or p.username or p.password:
-        raise HTTPException(422, 'Provide a valid public website domain.')
-    return p.hostname.lower().removeprefix('www.')
+    if p.scheme not in ("http", "https") or not p.hostname or p.username or p.password:
+        raise HTTPException(422, "Provide a valid public website domain.")
+    return p.hostname.lower().removeprefix("www.")
 
 def register_memory_routes(app):
     router = APIRouter()
