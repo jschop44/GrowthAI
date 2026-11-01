@@ -134,4 +134,45 @@
   $('historyCompare').onclick=async()=>{try{showIntel('neuralResults',await intelGet('/api/intelligence/history-changes'));}
     catch(e){$('neuralResults').textContent=String(e.message);}};
 
+  $('publicIntelRun').onclick = async () => {
+    const key=$('privateKey')?.value.trim(), url=$('url')?.value.trim(), cik=$('publicCik').value.trim();
+    if (!key || !url) { $('publicIntelStatus').textContent='Enter your access key and website URL first.'; return; }
+    $('publicIntelRun').disabled=true;
+    $('publicIntelStatus').textContent='Querying independent public-data providers concurrently...';
+    try {
+      const response=await fetch('/api/intelligence-team',{method:'POST',
+        headers:{'Content-Type':'application/json','X-GrowthLens-Key':key},
+        body:JSON.stringify({url,cik:cik||null,radius_miles:selectedRadius(),business_address:$('localAddress').value.trim()||null,industry:$('publicIndustry').value||null})});
+      const data=await response.json();
+      if (!response.ok) throw Error(data.detail||'Public intelligence request failed');
+      const names={website:'Website intelligence',discovery:'Competitor discovery',pagespeed_mobile:'Mobile performance',pagespeed_desktop:'Desktop performance',corporate_filings:'SEC public-company filings',crux_mobile:'Real-user mobile experience',crux_desktop:'Real-user desktop experience',verification:'Evidence verification',opportunities:'Growth opportunities'};
+      $('publicIntelOutput').replaceChildren();
+      const heading=document.createElement('h3');heading.textContent='Independent public intelligence';$('publicIntelOutput').append(heading);
+      const skipped=[];
+      for (const [id,result] of Object.entries(data.engines||{})) {
+        if(result.status==='not_requested'||result.status==='not_configured'){skipped.push(names[id]||id);continue;}
+        const paragraph=document.createElement('p');
+        const label=document.createElement('strong');label.textContent=(names[id]||id)+': ';
+        paragraph.append(label,document.createTextNode(result.status==='available'
+          ? (result.performance_score!=null?result.performance_score+'/100 lab performance score':result.company_name||(id==='discovery'?(result.competitors||[]).length+' competitor listings':id==='verification'?(result.available_engines||[]).length+' sources available':id==='opportunities'?(result.recommendations||[]).length+' evidence-backed recommendations':'Available'))
+          : (result.reason||result.status)));
+        if (result.evidence_url && /^https:\/\//.test(result.evidence_url)) {
+          const link=document.createElement('a');link.href=result.evidence_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=' · Source';paragraph.append(link);
+        }
+        $('publicIntelOutput').append(paragraph);
+      }
+      const discovery=data.engines?.discovery||{};
+      const rivals=Array.isArray(discovery.competitors)?discovery.competitors:[];
+      const opportunities=data.engines?.opportunities||{};
+      const output=$('localOutput'); output.replaceChildren();
+      const title=document.createElement('h3'); title.textContent='Nearby competition ('+rivals.length+' public listings)'; output.append(title);
+      const note=document.createElement('p'); note.className='muted'; note.textContent=discovery.warning||discovery.reason||discovery.source||'Public listings may be incomplete.'; output.append(note);
+      if(rivals.length){ const table=document.createElement('table'); const head=document.createElement('thead'); head.innerHTML='<tr><th>Business</th><th>Distance</th><th>Source</th></tr>';table.append(head); const body=document.createElement('tbody'); for(const rival of rivals){const tr=document.createElement('tr'); for(const value of [rival.name||'Unnamed',rival.distance_miles!=null?rival.distance_miles+' mi':'Unknown',(rival.source_providers||[rival.provider||'Public listing']).join(', ')]){const td=document.createElement('td');td.textContent=value;tr.append(td);}body.append(tr);}table.append(body);output.append(table);}
+      const opportunityHeading=document.createElement('h3');opportunityHeading.textContent='Evidence-supported opportunities';output.append(opportunityHeading);
+      const list=document.createElement('ul');for(const item of opportunities.recommendations||[]){const li=document.createElement('li');li.textContent=(item.issue||'Opportunity')+': '+(item.recommendation||'')+' ('+(item.evidence||'limited evidence')+')';list.append(li);}if(!list.children.length){const li=document.createElement('li');li.textContent='No verified opportunities established from available evidence.';list.append(li);}output.append(list);
+      if(data.memory){const memory=document.createElement('p');memory.className='muted';memory.textContent='Intelligence memory: '+data.memory.prior_observations+' previous observations; '+data.memory.new_observations+' new; '+(data.memory.persistent?'persistent storage':'temporary local storage')+'; '+(data.memory.neural_embeddings?'neural embeddings':'deterministic embeddings (neural inference unavailable)')+'.';$('publicIntelOutput').append(memory);}
+      $('publicIntelStatus').textContent='Analysis complete. '+(skipped.length?skipped.length+' optional sources skipped (not configured or not applicable). ':'')+'Unavailable provider results are not scored as zero.';
+    } catch(e) { $('publicIntelStatus').textContent=String(e.message); }
+    finally { $('publicIntelRun').disabled=false; }
+  };
 })()
