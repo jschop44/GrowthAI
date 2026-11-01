@@ -310,7 +310,7 @@ from backend.intelligence_team import register_team_routes
 register_team_routes(app, validate_url, fetch_public, robots_allowed, analyze_html)
 
 from backend.intelligence_memory import register_memory_routes
-register_memory_routes(app)
+MEMORY_SELF_TEST = register_memory_routes(app)
 
 # Verify provider round trips once per deployment without exposing the private API key.
 @app.on_event('startup')
@@ -318,9 +318,7 @@ def verify_memory_on_startup():
     def check():
         import logging
         try:
-            route=next(route for route in app.routes
-                       if getattr(route,'path',None)=='/api/intelligence/memory-health')
-            result=route.endpoint()
+            result=MEMORY_SELF_TEST()
             logging.getLogger('growthlens.memory').info(
                 'memory_self_test status=%s qdrant=%s semantic=%s postgres=%s match=%s',
                 result.get('status'),result.get('qdrant_write_and_read_verified'),
