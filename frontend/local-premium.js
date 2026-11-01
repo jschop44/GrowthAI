@@ -1,4 +1,4 @@
-/* GrowthLens premium private beta: evidence-first local market explorer and editable what-if math. */
+/* GrowthLens premium private beta: evidence-first local market explorer and automatic evidence-limited scenarios. */
 (() => {
   'use strict';
   const panel = document.getElementById('localCompetition');
@@ -138,31 +138,6 @@
     }
     if(!issues.length)playbooks.append(element('li','', 'No failed target-page checks to prioritize.'));
     root.append(playbooks);
-    root.append(element('h3','', 'Financial what-if simulator'));
-    root.append(element('p','gl-alert','Not a verified loss. No competitor financial performance was measured. These figures use only your own editable hypothetical inputs and cannot predict sales.'));
-    const calculator=element('div','gl-calculator');
-    for(const spec of [
-      ['glVisits','Monthly website visits (input)',1000,0,100000000,1],
-      ['glConversion','Baseline conversion rate (%)',2,0,100,.1],
-      ['glValue','Revenue per conversion ($)',150,0,100000000,1],
-      ['glUplift','Hypothetical relative conversion improvement (%)',10,0,1000,1],
-      ['glCost','One-time implementation cost ($)',1000,0,100000000,1],
-      ['glDelay','Delay before improvement (months)',1,0,12,1]
-    ])calculator.append(input(...spec));
-    root.append(calculator);
-    const result=element('p','gl-result');
-    const note=element('p','gl-help','Revenue, not profit. No statistical confidence or causal lift is established. Do not combine with automatic scenario rows.');
-    root.append(result,note);
-    const update=()=>{
-      const vals=['glVisits','glConversion','glValue','glUplift','glCost','glDelay'].map((id,i)=>finite(document.getElementById(id)?.value,0,[1e8,100,1e8,1000,1e8,12][i]));
-      if(vals.some(v=>v===null)){result.textContent='Enter valid nonnegative values within each field range.';return;}
-      const [visits,conversion,value,lift,cost,delay]=vals;
-      const annualIncrement=visits*12*(conversion/100)*(lift/100)*value;
-      const firstYear=Math.max(0,12-delay)/12*annualIncrement-cost;
-      result.textContent=money(firstYear)+' illustrative first-year revenue less implementation cost';
-    };
-    calculator.querySelectorAll('input').forEach(el=>el.addEventListener('input',update));
-    update();
     root.append(element('p','gl-help','Source coverage: '+String(data.discovery_source||'Unspecified')+'. Generated values are illustrative unless independently verified.'));
   }
   panel.addEventListener('growthlens:report',e=>renderPremium(e.detail||{}));
