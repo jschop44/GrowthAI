@@ -305,3 +305,6 @@ def local_premium_script():
 # Independent third-party evidence remains available even when a target disallows crawling.
 from backend.public_intelligence import register_public_intelligence
 register_public_intelligence(app, validate_url)
+
+from backend.intelligence_team import register_team_routes
+register_team_routes(app, validate_url, fetch_public, robots_allowed, analyze_html)
