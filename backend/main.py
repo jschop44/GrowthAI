@@ -301,3 +301,7 @@ def local_premium_script():
         os.path.join(ROOT, 'frontend', 'local-premium.js'),
         media_type='application/javascript'
     )
+
+# Independent third-party evidence remains available even when a target disallows crawling.
+from backend.public_intelligence import register_public_intelligence
+register_public_intelligence(app, validate_url)
