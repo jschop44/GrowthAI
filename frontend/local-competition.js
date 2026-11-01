@@ -104,11 +104,4 @@
     } catch(e) { $('localStatus').textContent=e.message; }
     finally { $('localRun').disabled=false; }
   };
-})();+esc(x.assumptions.illustrative_average_transaction_usd)+'; conversion lift assumption 0.5%–3%. Observed competitor examples: '+esc(x.competitor_examples.join(", "))+'</p></div>').join("") || '<p>No evidence-backed modeled opportunities for this search.</p>'}
-        <h3>Traffic and revenue evidence</h3><p><strong>Verified visits:</strong> Unavailable. ${esc(data.traffic.status)}</p><p><strong>Verified revenue opportunity:</strong> Unavailable. ${esc(data.revenue.status)}</p>
-        <p class="localNote">${esc(data.limitations.join(' '))}</p>`;
-      $('localStatus').textContent=`Local ${data.radius_miles}-mile analysis complete. You can print this section with the main report.`;
-    } catch(e) { $('localStatus').textContent=e.message; }
-    finally { $('localRun').disabled=false; }
-  };
-})();
+})()
