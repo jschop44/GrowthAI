@@ -20,7 +20,9 @@ def vectorize(text):
                 r=client.post("https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction",headers={"Authorization":"Bearer "+token},json={"inputs":text[:2500]})
                 r.raise_for_status()
                 values=r.json()
-            if len(values)==DIM and all(isinstance(v,(int,float)) for v in values):
+            if isinstance(values,list) and len(values)==1 and isinstance(values[0],list):
+                values=values[0]
+            if isinstance(values,list) and len(values)==DIM and all(isinstance(v,(int,float)) for v in values):
                 norm=math.sqrt(sum(v*v for v in values)) or 1
                 return [v/norm for v in values],"neural"
         except (httpx.HTTPError,ValueError,TypeError,KeyError):
@@ -31,6 +33,29 @@ def vectorize(text):
         values[int.from_bytes(digest[:4],"big")%DIM]+=1 if digest[4]%2 else -1
     norm=math.sqrt(sum(v*v for v in values)) or 1
     return [v/norm for v in values],"deterministic"
+
+def diagnose_providers():
+    """Return only safe HTTP status and error categories, never secrets or URLs."""
+    output={}
+    cfg=config()
+    if cfg:
+        try:
+            with httpx.Client(timeout=10,trust_env=False) as client:
+                r=client.get(cfg[0]+"/collections",headers=cfg[1])
+            output["qdrant"]={"http_status":r.status_code,"reachable":r.is_success}
+        except httpx.HTTPError as e:
+            output["qdrant"]={"reachable":False,"error_type":type(e).__name__}
+    else: output["qdrant"]={"configured":False}
+    token=os.getenv("HF_TOKEN","").strip()
+    if token:
+        try:
+            with httpx.Client(timeout=12,trust_env=False) as client:
+                r=client.post("https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction",headers={"Authorization":"Bearer "+token},json={"inputs":"GrowthLens test"})
+            output["hugging_face"]={"http_status":r.status_code,"reachable":r.is_success,"response_shape":type(r.json()).__name__ if r.is_success else None}
+        except (httpx.HTTPError,ValueError) as e:
+            output["hugging_face"]={"reachable":False,"error_type":type(e).__name__}
+    else: output["hugging_face"]={"configured":False}
+    return output
 
 def config():
     url=os.getenv("QDRANT_URL","").rstrip("/")
