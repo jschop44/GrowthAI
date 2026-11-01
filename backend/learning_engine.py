@@ -16,20 +16,7 @@ MODEL="sentence-transformers/all-minilm-l6-v2"
 COLLECTION_NEURAL="growthlens_neural_v1"
 
 def vectorize(text):
-    token=os.getenv("HF_TOKEN","").strip()
-    if token and os.getenv("ENABLE_PAID_HF_INFERENCE") == "1":
-        try:
-            with httpx.Client(timeout=12,trust_env=False) as client:
-                r=client.post("https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction",headers={"Authorization":"Bearer "+token},json={"inputs":text[:2500]})
-                r.raise_for_status()
-                values=r.json()
-            if isinstance(values,list) and len(values)==1 and isinstance(values[0],list):
-                values=values[0]
-            if isinstance(values,list) and len(values)==DIM and all(isinstance(v,(int,float)) for v in values):
-                norm=math.sqrt(sum(v*v for v in values)) or 1
-                return [v/norm for v in values],"neural"
-        except (httpx.HTTPError,ValueError,TypeError,KeyError):
-            pass
+    # Free local deterministic fallback when Qdrant neural inference is unavailable.
     values=[0.0]*DIM
     for token in re.findall(r"[a-z0-9]{2,}",text.lower())[:400]:
         digest=hashlib.sha256(token.encode()).digest()
@@ -49,15 +36,6 @@ def diagnose_providers():
         except httpx.HTTPError as e:
             output["qdrant"]={"reachable":False,"error_type":type(e).__name__}
     else: output["qdrant"]={"configured":False}
-    token=os.getenv("HF_TOKEN","").strip()
-    if token and os.getenv("ENABLE_PAID_HF_INFERENCE") == "1":
-        try:
-            with httpx.Client(timeout=12,trust_env=False) as client:
-                r=client.post("https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction",headers={"Authorization":"Bearer "+token},json={"inputs":"GrowthLens test"})
-            output["hugging_face"]={"http_status":r.status_code,"reachable":r.is_success,"response_shape":type(r.json()).__name__ if r.is_success else None}
-        except (httpx.HTTPError,ValueError) as e:
-            output["hugging_face"]={"reachable":False,"error_type":type(e).__name__}
-    else: output["hugging_face"]={"configured":bool(token),"status":"disabled_to_avoid_paid_inference","free_fallback":"local deterministic embeddings"}
     return output
 
 def config():
