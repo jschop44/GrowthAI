@@ -19,6 +19,7 @@ jobs:
       - run: PYTHONPATH=. python -m pytest -q tests
       - run: python -m compileall -q backend
       - run: node --check frontend/local-competition.js
+      - run: node --check frontend/local-premium.js
       - run: npm install --no-save playwright@1.56.1
       - run: npx playwright install --with-deps chromium
       - name: Chromium responsive UI smoke tests
