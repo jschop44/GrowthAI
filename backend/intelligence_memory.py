@@ -68,4 +68,21 @@ def register_memory_routes(app):
         with db() as conn:
             rows = conn.execute('SELECT id,field,value,source_url,verification,recorded_at,note FROM business_evidence WHERE business_domain=? ORDER BY id DESC LIMIT 100', (domain,)).fetchall()
         return {'domain':domain,'evidence':[dict(r) for r in rows], 'durable':False,'note':'Stored observations are not automatically trusted or used to retrain a model.'}
+    @router.get('/api/intelligence/memory-health')
+    def memory_health():
+        # This endpoint is protected by the same private API middleware as other /api/intelligence routes.
+        qdrant_configured = learning_engine.config() is not None
+        hf_configured = bool(os.getenv('HF_TOKEN', '').strip())
+        vector, mode = learning_engine.vectorize('GrowthLens memory connection test')
+        subject = 'growthlens:connection-test'
+        outcome = learning_engine.store(subject, 'connection_test',
+            {'source': 'GrowthLens internal connection diagnostic', 'purpose': 'verify storage and retrieval'}, verified=False)
+        retrieved = learning_engine.recall(subject, limit=25)
+        persisted = outcome.get('persistent', False) and retrieved.get('storage') == 'qdrant' and any(
+            item.get('kind') == 'connection_test' for item in retrieved.get('observations', []))
+        return {'qdrant_configured': qdrant_configured, 'qdrant_write_and_read_verified': persisted,
+                'hugging_face_configured': hf_configured, 'neural_inference_verified': mode == 'neural',
+                'embedding_mode': mode, 'memory_storage': retrieved.get('storage'),
+                'status': 'fully_connected' if persisted and mode == 'neural' else 'partial',
+                'note': 'Diagnostic uses a synthetic record and does not expose credentials.'}
     app.include_router(router)
