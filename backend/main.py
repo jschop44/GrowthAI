@@ -371,6 +371,8 @@ def analyze_html(html, url, elapsed_ms):
             'hypothetical_relative_conversion_lift':lift},
           'confidence':'illustrative_only',
           'note':'Not a forecast. Actual traffic, downtime, retention and conversion impact were not measured. Do not add estimates across recommendations.'}
+    # Preserve the distinction between observed HTML and inferred business value.
+    # Avoid recommending optional features as confirmed defects.
     # Additional HTML-observable indicators; optional features are not universal requirements.
     forms=soup.find_all('form')
     scripts=soup.find_all('script',src=True)
