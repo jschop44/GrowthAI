@@ -37,6 +37,34 @@ def pagespeed_worker(url, strategy):
     except (httpx.HTTPError, ValueError, TypeError, KeyError):
         return {"status": "unavailable", "source": "Google PageSpeed Insights", "reason": "Provider failed, throttled, or returned incomplete data"}
 
+def crux_worker(url, form_factor):
+    """Optional real-user Core Web Vitals, independent of PageSpeed lab scores."""
+    key = os.getenv("GOOGLE_CRUX_API_KEY", "").strip() or os.getenv("GOOGLE_PAGESPEED_API_KEY", "").strip()
+    if not key:
+        return {"status": "not_configured", "source": "Chrome UX Report",
+                "reason": "Optional Google API key not configured; no real-user metrics inferred"}
+    from urllib.parse import urlsplit
+    parsed = urlsplit(url)
+    origin = parsed.scheme + "://" + parsed.netloc
+    try:
+        with httpx.Client(trust_env=False, timeout=12) as client:
+            response = client.post("https://chromeuxreport.googleapis.com/v1/records:queryRecord",
+                params={"key": key}, json={"origin": origin, "formFactor": form_factor})
+            response.raise_for_status()
+            payload = response.json()
+        metrics = (payload.get("record") or {}).get("metrics") or {}
+        if not metrics:
+            return {"status": "unavailable", "source": "Chrome UX Report",
+                    "reason": "No eligible aggregated field measurements"}
+        return {"status": "available", "source": "Chrome UX Report",
+                "form_factor": form_factor, "scope": "28-day rolling origin-level real-user aggregate",
+                "metrics_p75": {name: item["percentiles"]["p75"] for name, item in metrics.items()
+                                if isinstance(item, dict) and "p75" in (item.get("percentiles") or {})},
+                "evidence_url": "https://developer.chrome.com/docs/crux/"}
+    except (httpx.HTTPError, ValueError, TypeError, KeyError):
+        return {"status": "unavailable", "source": "Chrome UX Report",
+                "reason": "Real-user measurement unavailable or provider quota reached"}
+
 def sec_worker(cik):
     if not cik:
         return {"status": "not_requested", "source": "SEC EDGAR", "reason": "A verified public-company CIK is required; no automatic name matching"}
@@ -60,7 +88,9 @@ def sec_worker(cik):
 def run_public_intelligence(url, cik=None):
     jobs = {"pagespeed_mobile": (pagespeed_worker, (url, "mobile")),
             "pagespeed_desktop": (pagespeed_worker, (url, "desktop")),
-            "corporate_filings": (sec_worker, (cik,))}
+            "corporate_filings": (sec_worker, (cik,)),
+            "crux_mobile": (crux_worker, (url, "PHONE")),
+            "crux_desktop": (crux_worker, (url, "DESKTOP"))}
     results = {}
     pending = {}
     cache_hits = []
@@ -76,7 +106,7 @@ def run_public_intelligence(url, cik=None):
         else:
             pending[name] = jobs[name]
     if pending:
-        with ThreadPoolExecutor(max_workers=min(3, len(pending))) as executor:
+        with ThreadPoolExecutor(max_workers=min(5, len(pending))) as executor:
             futures = {name: executor.submit(fn, *args) for name, (fn, args) in pending.items()}
             for name, future in futures.items():
                 try:
