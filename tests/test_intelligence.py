@@ -93,3 +93,23 @@ def test_postgres_recovery_when_neural_collection_empty(monkeypatch):
     result=learning_engine.recall('https://example.com')
     assert result['storage']=='postgres'
     assert result['observations'][0]['id']=='restored'
+
+
+def test_expanded_audit_findings_have_actionable_steps():
+    from backend.main import analyze_html
+    result=analyze_html('<html><head><title>Short</title></head><body><h1>Home</h1><input type="text"></body></html>',
+                        'https://example.com/',25)
+    assert result['max_score']==100
+    assert result['score']<=100
+    assert len(result['findings'])>=15
+    assert all(isinstance(f['implementation_steps'],list) and f['implementation_steps']
+               for f in result['findings'])
+    assert result['observations']['unlabeled_inputs']==1
+    assert any(f['id']=='form_accessibility' and not f['passed'] for f in result['findings'])
+
+
+def test_business_lookup_requires_private_key():
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    response=TestClient(app).post('/api/business-lookup',json={'query':'Sample Pizza'})
+    assert response.status_code==401
