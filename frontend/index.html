@@ -618,7 +618,29 @@ $("auditForm").onsubmit = async e => {
 
     await loadHistory();
   } catch (err) {
-    $("status").textContent = err.message;
+    if (/robots\\.txt|does not permit this audit|could not be checked/i.test(err.message)) {
+      $("status").textContent = "Direct website inspection is restricted or permission could not be confirmed. Checking independent public sources instead…";
+      try {
+        const fallback = await api("/api/public-intelligence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({url: $("url").value.trim(), cik: null})
+        });
+        const sources = fallback.engines || {};
+        const lines = Object.entries(sources).map(([name, item]) => {
+          const label = ({pagespeed_mobile:"Mobile performance",pagespeed_desktop:"Desktop performance",crux_mobile:"Real-user mobile data",crux_desktop:"Real-user desktop data",corporate_filings:"SEC filings"})[name] || name;
+          const value = item.status === "available"
+            ? (typeof item.performance_score === "number" ? Math.round(item.performance_score) + "/100" : "Public data available")
+            : (item.reason || "Not available");
+          return label + ": " + value;
+        });
+        $("status").textContent = "Direct website audit unavailable. Independent public-source results (not a completed website audit): " + lines.join(" · ") + ". For SEC filings, enter a CIK in the Corporate Intelligence section below.";
+      } catch (fallbackError) {
+        $("status").textContent = "Website inspection was not permitted or could not be verified. Independent public-source lookup also failed: " + fallbackError.message;
+      }
+    } else {
+      $("status").textContent = err.message;
+    }
   } finally {
     b.disabled = false;
   }
