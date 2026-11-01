@@ -11,6 +11,8 @@ import httpx
 
 COLLECTION="growthlens_memory_v1"
 DIM=384
+MODEL="sentence-transformers/all-minilm-l6-v2"
+COLLECTION_NEURAL="growthlens_neural_v1"
 
 def vectorize(text):
     token=os.getenv("HF_TOKEN","").strip()
@@ -63,6 +65,38 @@ def config():
     if not url.startswith("https://") or not key: return None
     return url,{"api-key":key}
 
+def neural_upsert(record, text):
+    cfg=config()
+    if not cfg: return False, "not_configured"
+    url,headers=cfg
+    try:
+        with httpx.Client(timeout=15,trust_env=False) as client:
+            check=client.get(url+"/collections/"+COLLECTION_NEURAL,headers=headers)
+            if check.status_code==404:
+                check=client.put(url+"/collections/"+COLLECTION_NEURAL,headers=headers,json={"vectors":{"size":DIM,"distance":"Cosine"}})
+            check.raise_for_status()
+            idx=client.put(url+"/collections/"+COLLECTION_NEURAL+"/index",headers=headers,params={"wait":"true"},json={"field_name":"subject","field_schema":"keyword"})
+            if idx.status_code not in (200,201,202,409): idx.raise_for_status()
+            upsert=client.put(url+"/collections/"+COLLECTION_NEURAL+"/points",headers=headers,params={"wait":"true"},json={"points":[{"id":record["id"],"vector":{"text":text[:2500],"model":MODEL},"payload":dict(record,embedding_model=MODEL)}]})
+            upsert.raise_for_status()
+        return True,"neural"
+    except httpx.HTTPStatusError as exc:
+        return False,"http_"+str(exc.response.status_code)
+    except (httpx.HTTPError,ValueError,TypeError):
+        return False,"connection_error"
+
+def neural_recall(subject,limit=12):
+    cfg=config()
+    if not cfg:return None
+    url,headers=cfg
+    try:
+        with httpx.Client(timeout=12,trust_env=False) as client:
+            r=client.post(url+"/collections/"+COLLECTION_NEURAL+"/points/scroll",headers=headers,json={"filter":{"must":[{"key":"subject","match":{"value":subject}}]},"limit":min(limit,25),"with_payload":True,"with_vector":False})
+            r.raise_for_status()
+        return [x["payload"] for x in r.json()["result"]["points"]]
+    except (httpx.HTTPError,ValueError,KeyError,TypeError):
+        return None
+
 def local():
     path=os.getenv("GROWTHLENS_MEMORY_DB") or os.getenv("GROWTHLENS_DB") or "/tmp/growthlens_learning.sqlite3"
     db=sqlite3.connect(path,timeout=5)
@@ -75,10 +109,12 @@ def store(subject,kind,data,verified=False):
     raw=json.dumps(data,default=str)
     if len(raw)>12000:return {"stored":False,"reason":"Evidence too large"}
     record={"id":str(uuid.uuid5(uuid.NAMESPACE_URL,subject+kind+raw)),"subject":subject,"kind":kind,"data":data,"recorded":int(time.time()),"verified":bool(verified)}
-    vector,mode=vectorize(subject+" "+kind+" "+raw)
+    text=subject+" "+kind+" "+raw
+    neural,neural_reason=neural_upsert(record,text)
+    vector,mode=vectorize(text) if not neural else ([0.0]*DIM,"neural")
     remote=False
     cfg=config()
-    if cfg:
+    if cfg and not neural:
         url,headers=cfg
         try:
             with httpx.Client(timeout=9,trust_env=False) as client:
@@ -100,9 +136,11 @@ def store(subject,kind,data,verified=False):
         cached=True
     except sqlite3.Error:
         pass
-    return {"stored":remote or cached,"persistent":remote,"embedding":mode,"storage":"qdrant" if remote else "ephemeral" if cached else "unavailable"}
+    return {"stored":neural or remote or cached,"persistent":neural or remote,"embedding":mode,"storage":"qdrant_neural" if neural else "qdrant" if remote else "ephemeral" if cached else "unavailable","neural_status":"active" if neural else neural_reason}
 
 def recall(subject,limit=12):
+    neural=neural_recall(subject,limit)
+    if neural is not None:return {"storage":"qdrant_neural","observations":neural}
     cfg=config()
     if cfg:
         url,headers=cfg
