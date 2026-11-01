@@ -132,14 +132,14 @@ def _business_candidates(query, client):
                 params={'q':query+' official business website','format':'rss'},
                 headers={'User-Agent':AGENT,'Accept':'application/rss+xml'},timeout=10)
             response.raise_for_status()
-            rss=BeautifulSoup(response.text[:250000],'xml')
-            for item in rss.find_all('item')[:8]:
-                link=item.find('link')
-                title=item.find('title')
-                if link and link.get_text(strip=True).startswith('https://'):
-                    add(title.get_text(' ',strip=True) if title else query,'',
-                        link.get_text(strip=True),'Public web search (verify business identity)')
-        except (httpx.HTTPError,ValueError):
+            from xml.etree import ElementTree
+            rss=ElementTree.fromstring(response.text[:250000])
+            for item in rss.findall('.//item')[:8]:
+                link=item.findtext('link','').strip()
+                title=item.findtext('title',query)
+                if link.startswith('https://'):
+                    add(title,'',link,'Public web search (verify business identity)')
+        except (httpx.HTTPError,ValueError,ElementTree.ParseError):
             pass
     return candidates[:12]
 
