@@ -192,6 +192,26 @@ def create_audit(body: AuditRequest):
         result=analyze_html(response.text,final_url,elapsed)
         with database() as conn:
             conn.execute('UPDATE audits SET status=?,score=?,result_json=? WHERE id=?',('completed',result['score'],json.dumps(result),audit_id))
+        # Record source-attributed snapshots after a successful audit. Storage
+        # failure must never turn a completed audit into a failed audit.
+        try:
+            from backend import learning_engine
+            subject='https://'+urlparse(final_url).hostname.lower().removeprefix('www.')
+            observations=result.get('observations') or {}
+            snapshot={'source':final_url,'audit_id':audit_id,'score':result['score'],
+                      'observed_at':datetime.now(timezone.utc).isoformat(),
+                      'title':str(observations.get('title',''))[:200],
+                      'findings':result.get('findings',[])[:20],
+                      'metrics':observations,
+                      'verification':'public_page_observed'}
+            saved=learning_engine.store(subject,'website_audit',snapshot,verified=True)
+            result['intelligence_memory']={'stored':bool(saved.get('stored')),
+                'persistent':bool(saved.get('persistent')),
+                'storage':saved.get('storage')}
+        except Exception:
+            import logging
+            logging.getLogger('growthlens.audit').exception('Audit memory persistence failed')
+            result['intelligence_memory']={'stored':False,'persistent':False}
         return {'id':audit_id,'status':'completed',**result}
     except (httpx.HTTPError,ValueError) as exc:
         with database() as conn:
