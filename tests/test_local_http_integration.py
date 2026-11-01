@@ -12,7 +12,7 @@ RIVAL = "<html><head><title>Nearby Roofer</title></head><body><h1>Nearby Roofer<
 
 def test_local_http_report_with_competitor_evidence(monkeypatch):
     monkeypatch.setenv("GROWTHLENS_PRIVATE_KEY", "testing-secret")
-    monkeypatch.setattr(main, "validate_url", lambda url: url)
+    monkeypatch.setattr(main.socket, "getaddrinfo", lambda *args, **kwargs: [(2, 1, 6, "", ("93.184.215.14", 0))])
     monkeypatch.setattr(main, "robots_allowed", lambda client, url: True)
     class FakeResponse:
         def __init__(self, text):
