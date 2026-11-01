@@ -20,3 +20,16 @@ def test_team_route_requires_private_key():
     from backend.main import app
     response = TestClient(app).post("/api/intelligence-team", json={"url": "https://example.com"})
     assert response.status_code == 401
+
+def test_discovery_with_blocked_website_and_explicit_industry(monkeypatch):
+    class Client:
+        def __init__(self, *args, **kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+    monkeypatch.setattr(team.httpx, "Client", Client)
+    monkeypatch.setattr(team, "geocode", lambda client, identity: (39.5, -76.3, "user supplied address"))
+    monkeypatch.setattr(team, "discover_competitors", lambda *args: ([{"name": "Pizza Example"}], None, "Geoapify + Overpass"))
+    result = team.discovery_worker({"status": "blocked"}, "Bel Air, MD", 15, "pizza")
+    assert result["status"] == "available"
+    assert result["classification"]["confidence"] == "user-supplied"
+    assert len(result["competitors"]) == 1
