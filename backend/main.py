@@ -130,7 +130,7 @@ def analyze_html(html, url, elapsed_ms):
     internal_links = len([link for link in links if urlparse(link).hostname == domain])
     checks = [
                 ('title','Descriptive page title',bool(20 <= len(title) <= 65),15,'Add a unique, descriptive title of roughly 20-65 characters.'),
-        ('description','Meta description',bool(70 <= len(description) <= 170),12,'Write a relevant meta description of roughly 70â170 characters.'),
+        ('description','Meta description',bool(70 <= len(description) <= 170),12,'Write a relevant meta description of roughly 70–170 characters.'),
         ('h1','Single primary heading',len(h1s)==1,12,'Use one clear H1 heading describing the page.'),
         ('viewport','Mobile viewport metadata',viewport,12,'Add a responsive viewport meta tag.'),
         ('https','HTTPS',urlparse(url).scheme=='https',12,'Serve the website over HTTPS.'),
