@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 ROOT = os.path.dirname(os.path.dirname(__file__))
 DB = os.environ.get('GROWTHLENS_DB', os.path.join(ROOT, 'growthlens.db'))
 AGENT = 'GrowthLensAuditBot/0.1 (+public website audit)'
-app = FastAPI(title='GrowthLens AI Private Beta', version='0.3.0')
+app = FastAPI(title='GrowthLens AI Private Beta', version='1.1.0')
 AUDIT_LOCK = threading.BoundedSemaphore(2)
 
 @app.middleware('http')
@@ -169,7 +169,7 @@ def homepage():
 
 @app.get('/api/health')
 def health():
-    return {'status':'ok','version':'0.3.0','ai_enabled':bool(os.environ.get('GEMINI_API_KEY')),'pagespeed_enabled':True}
+    return {'status':'ok','version':'1.1.0','ai_enabled':bool(os.environ.get('GEMINI_API_KEY')),'pagespeed_enabled':True}
 
 @app.post('/api/audits')
 def create_audit(body: AuditRequest):
