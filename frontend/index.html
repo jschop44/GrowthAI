@@ -287,17 +287,18 @@ footer {
     <section class="card">
       <h2>Website Audit</h2>
       <form id="auditForm">
-        <label for="url">Website URL</label>
+        <label for="url">Business name or website URL</label>
         <input id="url" type="text"
-          placeholder="https://example.com" required>
+          placeholder="e.g. Tamberino’s Pizza Bel Air MD or https://example.com" required>
         <button id="auditButton" type="submit">
-          Analyze Website
+          Find &amp; Audit Business
         </button>
       </form>
       <p class="muted small">
         Checks one public HTML page. Some websites block automated audits.
       </p>
       <p id="status" role="status"></p>
+      <div id="businessMatches" aria-live="polite"></div>
     </section>
 
 
@@ -534,19 +535,23 @@ function render(data, createdAt = null) {
     esc(data.url) +
     "</p>";
 
-  $("findings").innerHTML = (data.findings || [])
-    .map(f =>
-      "<div class='finding'><strong class='" +
-      (f.passed ? "ok" : "bad") +
-      "'>" +
-      (f.passed ? "✓" : "✕") +
-      " " + esc(f.name) +
-      "</strong> · " + esc(f.weight) +
-      " points<p>" +
-      esc(f.passed ? "Check passed." : f.recommendation) +
-      "</p></div>"
-    ).join("");
-
+  const failedFindings=(data.findings||[]).filter(f=>!f.passed);
+  const passedFindings=(data.findings||[]).filter(f=>f.passed);
+  const renderFinding=f=>{
+    const steps=(f.implementation_steps||[]).map(step=>'<li>'+esc(step)+'</li>').join('');
+    return "<article class='finding'><strong class='"+(f.passed?"ok":"bad")+"'>"+
+      (f.passed?"✓ ":"Needs attention · ")+esc(f.name)+"</strong>"+
+      (f.weight?" · "+esc(f.weight)+" points":" · Additional diagnostic")+
+      "<p>"+esc(f.passed?"Check passed.":f.recommendation)+"</p>"+
+      (!f.passed&&steps?"<details open><summary>Step-by-step implementation</summary><ol>"+steps+
+        "</ol><p class='muted small'>"+esc(f.verification||'Re-run the audit after publishing.')+"</p></details>":"")+
+      "</article>";
+  };
+  $("findings").innerHTML=
+    "<h4>Recommended actions ("+failedFindings.length+")</h4>"+
+    failedFindings.sort((a,b)=>(b.weight||0)-(a.weight||0)).map(renderFinding).join('')+
+    "<h4>Checks passed ("+passedFindings.length+")</h4>"+
+    passedFindings.map(renderFinding).join('');
   $("results").scrollIntoView({ behavior: "smooth" });
 }
 
@@ -605,6 +610,29 @@ $("auditForm").onsubmit = async e => {
     "Analyzing website. Please wait...";
 
   try {
+    const input=$("url").value.trim();
+    const looksLikeUrl=/^(https?:\\/\\/)?(?:[a-z0-9-]+\\.)+[a-z]{2,}(?:[\\/:?#]|$)/i.test(input);
+    if(!looksLikeUrl){
+      const lookup=await api("/api/business-lookup",{method:"POST",
+        headers:{"Content-Type":"application/json"},body:JSON.stringify({query:input})});
+      const matches=lookup.matches||[];
+      if(!matches.length)throw Error("No verified website was found for that business name. Try adding the city and state, or enter its website URL.");
+      $("businessMatches").replaceChildren();
+      const intro=document.createElement("p");
+      intro.textContent="Select the correct business to audit:";
+      $("businessMatches").append(intro);
+      matches.forEach(item=>{
+        const button=document.createElement("button");
+        button.type="button";
+        button.textContent=(item.name||"Business")+" — "+(item.address||item.website);
+        button.style.cssText="display:block;text-align:left;max-width:100%;overflow-wrap:anywhere";
+        button.onclick=()=>{$("url").value=item.website;$("businessMatches").replaceChildren();$("auditForm").requestSubmit();};
+        $("businessMatches").append(button);
+      });
+      $("status").textContent="Choose the matching business above. Public directory listings may be outdated.";
+      return;
+    }
+    $("businessMatches").replaceChildren();
     const data = await api("/api/audits", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
