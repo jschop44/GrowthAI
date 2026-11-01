@@ -403,11 +403,11 @@ def register_local_routes(app, validate_url, fetch_public, robots_allowed, analy
                       'competitor_count':len(competitors),'radius_miles':body.radius_miles,
                       'observed_at':__import__('datetime').datetime.now(
                           __import__('datetime').timezone.utc).isoformat(),
-                      'findings':audit.get('findings',[])[:15],
-                      'opportunities':opportunities[:10],
+                      'findings':[{'id':f.get('id'),'passed':f.get('passed')} for f in audit.get('findings',[])[:10]],
+                      'opportunities':[{'issue':o.get('issue'),'recommendation':o.get('recommendation')} for o in opportunities[:5]],
                       'competitors':[{'name':c.get('name'),'website':c.get('website'),
                                       'score':c.get('score'),'status':c.get('status')}
-                                     for c in competitors[:10]],
+                                     for c in competitors[:5]],
                       'verification':'public_page_observed_and_third_party_discovery'}
             saved=learning_engine.store(subject,'local_competition_audit',snapshot,verified=False)
             memory_status={'stored':bool(saved.get('stored')),
