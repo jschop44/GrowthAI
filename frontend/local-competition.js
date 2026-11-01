@@ -6,8 +6,8 @@
   panel.className = 'card';
   panel.id = 'localCompetition';
   panel.innerHTML = `
-    <h2>Local Competitor Intelligence</h2>
-    <p class="muted">Discover nearby businesses using free OpenStreetMap data and compare publicly accessible webpages.</p>
+    <h2>Coordinated Intelligence Team &amp; Local Competition</h2>
+    <p class="muted">Run independent public-data, website, corporate and competitor intelligence together. This works even when a website blocks crawling if you provide an address and industry.</p>
     <fieldset id="localRadiusGroup" style="border:0;padding:0;margin:12px 0">
       <legend style="font-weight:700;margin-bottom:8px">Competitor search radius</legend>
       <div style="display:flex;gap:14px;flex-wrap:wrap">
@@ -28,7 +28,8 @@
     <button type="button" id="learningSave">Record feedback</button><p id="learningStatus" role="status"></p>`;
   const results = document.getElementById('results');
   if (!results) return;
-  results.parentNode.insertBefore(panel, results.nextSibling);
+  // Keep the intelligence team visible above audit results, even before any audit.
+  results.parentNode.insertBefore(panel, results);
   const style = document.createElement('style');
   style.textContent = `
     #localOutput{max-width:100%;overflow-x:auto;overflow-wrap:anywhere}\n    #localCompetition table{width:100%;border-collapse:collapse;font-size:13px}
