@@ -107,13 +107,13 @@
   const intelGet=async path=>{
     const key=$('privateKey')?.value.trim(),website=$('url')?.value.trim();
     if(!key||!website)throw Error('Enter the access key and website first.');
-    const res=await fetch(path+'?website='+encodeURIComponent(website),{headers:{'X-GrowthLens-Key':key}});
+    const res=await fetch(path+(path.includes('?')?'&':'?')+'website='+encodeURIComponent(website),{headers:{'X-GrowthLens-Key':key}});
     const data=await res.json();if(!res.ok)throw Error(data.detail||'Request failed');return data;
   };
   const showIntel=(id,data)=>{const el=$(id);el.replaceChildren();const pre=document.createElement('pre');pre.style.whiteSpace='pre-wrap';pre.style.overflowWrap='anywhere';pre.textContent=JSON.stringify(data,null,2);el.append(pre);};
   $('neuralSearch').onclick=async()=>{try{
     const query=$('neuralQuery').value.trim();if(query.length<2)throw Error('Enter a question.');
-    const data=await intelGet('/api/intelligence/evidence-ranking&unused=0'.replace('&unused=0','')+'&query='+encodeURIComponent(query));
+    const data=await intelGet('/api/intelligence/evidence-ranking?query='+encodeURIComponent(query));
     showIntel('neuralResults',data);
   }catch(e){$('neuralResults').textContent=String(e.message);}};
   $('historyCompare').onclick=async()=>{try{showIntel('neuralResults',await intelGet('/api/intelligence/history-changes'));}
