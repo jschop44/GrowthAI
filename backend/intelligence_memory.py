@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from backend import learning_engine
 
 DB_PATH = os.environ.get('GROWTHLENS_MEMORY_DB', '/tmp/growthlens_memory.sqlite3')
 
@@ -59,7 +60,8 @@ def register_memory_routes(app):
             conn.execute('INSERT INTO business_evidence (business_domain,field,value,source_url,verification,recorded_at,note) VALUES (?,?,?,?,?,?,?)',
                          (domain,body.field,body.value,source,'user_asserted',now(),body.note))
             conn.commit()
-        return {'status':'recorded','verification':'user_asserted','durable':False,'note':'Feedback is unverified and storage may be lost when free hosting restarts.'}
+        memory=learning_engine.store('https://'+domain,'user_feedback',{'source':'explicit user feedback','field':body.field,'value':body.value,'source_url':source},verified=False)
+        return {'status':'recorded','verification':'user_asserted','durable':memory.get('persistent',False),'memory':memory,'note':'Feedback remains user-asserted and does not retrain models automatically.'}
     @router.get('/api/intelligence/evidence')
     def list_evidence(website: str):
         domain = domain_for(website)
