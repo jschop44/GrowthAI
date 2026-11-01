@@ -371,6 +371,44 @@ def analyze_html(html, url, elapsed_ms):
             'hypothetical_relative_conversion_lift':lift},
           'confidence':'illustrative_only',
           'note':'Not a forecast. Actual traffic, downtime, retention and conversion impact were not measured. Do not add estimates across recommendations.'}
+    # Additional HTML-observable indicators; optional features are not universal requirements.
+    forms=soup.find_all('form')
+    scripts=soup.find_all('script',src=True)
+    external_scripts=sum(1 for x in scripts if urlparse(urljoin(url,x['src'])).hostname != domain)
+    images_lazy=sum(1 for x in imgs if x.get('loading','').lower()=='lazy')
+    responsive_images=sum(1 for x in imgs if x.get('srcset') or x.get('sizes'))
+    broken_anchor_targets=sum(1 for a in soup.find_all('a',href=True)
+        if a['href'].startswith('#') and len(a['href'])>1
+        and not soup.find(id=a['href'][1:]))
+    payment=bool(soup.find(string=re.compile(r'checkout|add to cart|secure payment',re.I)))
+    booking=bool(soup.find(string=re.compile(r'book online|schedule online|make an appointment',re.I)))
+    live_chat=bool(soup.find(attrs={'id':re.compile(r'chat|intercom|crisp',re.I)}))
+    newsletter=bool(soup.find(string=re.compile(r'subscribe|newsletter',re.I)))
+    policy=bool(soup.find('a',string=re.compile(r'privacy policy',re.I)))
+    for key,name,passed,rec,steps,cost,lift in [
+      ('responsive_images','Responsive image delivery',not imgs or responsive_images>0,'Use responsive srcset and sizes for large content images.',['Review image dimensions at mobile and desktop breakpoints.','Generate optimized width variants in the CMS or image pipeline.','Set srcset and sizes to match layout widths.','Confirm correct images load in browser network tools.'],(150,1100),.012),
+      ('lazy_images','Deferred below-fold images',not imgs or images_lazy>0,'Lazy-load appropriate below-fold images without delaying the hero image.',['Identify below-the-fold content images.','Set loading="lazy" on noncritical images only.','Keep the primary hero image eagerly loaded.','Verify scrolling and image loading on mobile.'],(100,650),.008),
+      ('anchor_integrity','Working in-page navigation',broken_anchor_targets==0,'Repair links to missing page anchors.',['List links beginning with #.','Match each fragment to an existing element id.','Update incorrect links or add the intended id.','Click-test each affected link.'],(75,450),.006),
+      ('privacy_policy','Privacy policy discoverability',policy,'Make an accurate privacy policy easy to find when applicable.',['Review actual collection and processing of visitor data.','Draft a policy matching the business practices and applicable laws.','Link it clearly in the footer.','Review it when tracking or data practices change.'],(150,1200),.004),
+      ('online_booking','Online booking opportunity',booking,'Consider online scheduling if appointments are central to this business.',['Confirm whether appointments are a core conversion goal.','Compare free scheduling options and existing CMS features.','Configure services, availability, confirmations and cancellation rules.','Test a complete booking on mobile and measure completed bookings.'],(150,1500),.025),
+      ('lead_capture','Lead capture and follow-up',bool(forms or newsletter),'Consider a simple lead form with consent and follow-up.',['Choose a valuable customer inquiry or newsletter use case.','Create a short accessible form and explain how data will be used.','Connect submissions to an approved inbox or CRM.','Test submission, consent and follow-up delivery.'],(120,950),.018),
+      ('commerce','Checkout or purchase path',payment,'Evaluate online purchasing only if the business sells directly online.',['Verify whether online transactions fit the business model.','Map the product-to-checkout path.','Use a reputable hosted checkout rather than collecting card data directly.','Test purchase and refund workflows before launch.'],(400,3500),.03),
+      ('chat_support','Live assistance option',live_chat,'Consider chat or a contact alternative if customers need immediate help.',['Review customer questions and response capacity.','Choose chat, callback or FAQ based on staffing.','Set clear availability and privacy expectations.','Measure qualified inquiries and response times.'],(100,1200),.012)
+    ]:
+        finding={'id':key,'name':name,'passed':passed,'weight':0,
+          'category':'Growth opportunities (context dependent)','recommendation':rec,
+          'implementation_steps':steps,'priority':'medium' if not passed else 'passed',
+          'verification':'Test the feature with real users; HTML detection alone is not conclusive.'}
+        low,high=cost
+        finding['financial_scenario']={'implementation_cost_usd':{'low':low,'high':high},
+          'annual_incremental_revenue_usd':round(1000*12*.02*100*lift),
+          'annual_incremental_contribution_usd':round(1000*12*.02*100*lift*.2),
+          'assumptions':{'monthly_visits':1000,'conversion_rate':.02,
+            'revenue_per_conversion_usd':100,'contribution_margin':.2,
+            'hypothetical_relative_conversion_lift':lift},
+          'confidence':'illustrative_only',
+          'note':'Optional feature, not a universal requirement. No actual traffic, customer retention or revenue measured. Do not sum recommendation estimates.'}
+        findings.append(finding)
     score = sum(f['weight'] for f in findings if f['passed'])
     return {'url':url,'score':score,'max_score':100,'scoring_scope':'Single-page on-page technical checks; not an overall business growth score','findings':findings,'observations':{'title':title,'meta_description':description,'h1_count':len(h1s),'image_count':len(imgs),'images_missing_alt':missing_alt,'internal_link_count':internal_links,'structured_data_blocks':structured,'fetch_elapsed_ms':round(elapsed_ms),'heading_counts':heading_counts,'document_language':lang,'generic_link_count':generic_links,'unlabeled_inputs':unlabeled_inputs,'social_title_present':bool(og_title),'social_image_present':bool(og_image),'navigation_detected':nav,'branding_detected':logo,'contact_links_detected':contacts,'primary_action_detected':cta,'faq_detected':faq,'trust_signals_detected':trust,'site_search_detected':search},'limitations':['Only the supplied page is analyzed, not the whole site.','No search rankings, traffic, competitor revenue, brand design quality, customer retention, downtime, or AI search visibility are measured.','Fetch time is not a Lighthouse or Core Web Vitals score. UX checks detect HTML signals, not actual ease of use. Financial estimates are illustrative assumptions, not measured returns.']}
 
