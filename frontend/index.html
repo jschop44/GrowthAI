@@ -407,6 +407,25 @@ button:hover:not(:disabled){filter:brightness(1.12)}
 
   </section>
 
+  <section class="card" id="scenarioPanel">
+    <h2>Revenue &amp; retention scenario</h2>
+    <p class="muted">Adjust assumptions to estimate potential benefit, implementation costs and downtime. These are hypothetical scenarios, not measured results.</p>
+    <form id="scenarioForm" class="grid">
+      <label>Monthly visitors <input name="monthly_visits" type="number" min="0" value="1000" required></label>
+      <label>Conversion rate (%) <input name="conversion_rate_percent" type="number" min="0" max="100" step=".1" value="2" required></label>
+      <label>Average sale ($) <input name="average_order_value_usd" type="number" min="0" step=".01" value="100" required></label>
+      <label>Gross margin (%) <input name="gross_margin_percent" type="number" min="0" max="100" value="20" required></label>
+      <label>Conversion improvement (%) <input name="conversion_lift_percent" type="number" min="0" value="5" required></label>
+      <label>Monthly existing repeat customers <input name="monthly_retained_customers" type="number" min="0" value="0" required></label>
+      <label>Additional repeat customers (%) <input name="incremental_retention_percent" type="number" min="0" max="100" value="0" required></label>
+      <label>One-time implementation ($) <input name="implementation_cost_usd" type="number" min="0" value="500" required></label>
+      <label>Monthly ongoing cost ($) <input name="monthly_operating_cost_usd" type="number" min="0" value="20" required></label>
+      <label>Implementation downtime (hours) <input name="downtime_hours" type="number" min="0" max="744" step=".1" value="0" required></label>
+      <button type="submit">Calculate scenario</button>
+    </form>
+    <div id="scenarioResult" role="status" aria-live="polite"></div>
+  </section>
+
   <section class="card">
     <h2>Recent Audits</h2>
     <div id="history" class="muted">
@@ -721,6 +740,25 @@ $("auditForm").onsubmit = async e => {
   }
 };
 
+
+$("scenarioForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const payload = Object.fromEntries([...new FormData(form)].map(([k,v]) => [k,Number(v)]));
+  $("scenarioResult").textContent = "Calculating...";
+  try {
+    const result = await api("/api/financial-estimate", {
+      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)
+    });
+    $("scenarioResult").innerHTML = "<div class='financial'><strong>Hypothetical annual added sales: "+money(result.annual_incremental_revenue_usd)+
+      "</strong><p>Additional gross profit: "+money(result.annual_incremental_gross_profit_usd)+
+      " · Downtime sales loss: "+money(result.estimated_downtime_sales_loss_usd)+
+      " · First-year total cost: "+money(result.first_year_total_cost_usd)+
+      " · First-year net contribution: "+money(result.first_year_net_contribution_usd)+
+      " · Payback: "+(result.payback_months===null?"Not reached":result.payback_months+" months")+
+      "</p><p class='muted small'>"+esc(result.note)+"</p></div>";
+  } catch(err) {$("scenarioResult").textContent=err.message;}
+});
 
 $("privateKey").addEventListener("change", loadHistory);
 
