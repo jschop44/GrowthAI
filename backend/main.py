@@ -200,6 +200,39 @@ def business_lookup(body: BusinessLookupRequest):
     return {'status':'matches' if matches else 'not_found','matches':matches,
             'note':'Choose the official website for the correct business. Search results are suggestions, not verified ownership.'}
 
+class FinancialEstimateRequest(BaseModel):
+    monthly_visits: int = Field(ge=0, le=100000000)
+    conversion_rate_percent: float = Field(ge=0, le=100)
+    average_order_value_usd: float = Field(ge=0, le=100000000)
+    gross_margin_percent: float = Field(ge=0, le=100)
+    conversion_lift_percent: float = Field(ge=0, le=1000)
+    monthly_retained_customers: int = Field(default=0, ge=0, le=100000000)
+    incremental_retention_percent: float = Field(default=0, ge=0, le=100)
+    implementation_cost_usd: float = Field(default=0, ge=0, le=100000000)
+    monthly_operating_cost_usd: float = Field(default=0, ge=0, le=100000000)
+    downtime_hours: float = Field(default=0, ge=0, le=744)
+
+@app.post('/api/financial-estimate')
+def financial_estimate(body: FinancialEstimateRequest):
+    baseline_orders=body.monthly_visits*body.conversion_rate_percent/100
+    new_orders=baseline_orders*body.conversion_lift_percent/100
+    retained=body.monthly_retained_customers*body.incremental_retention_percent/100
+    additional_revenue=(new_orders+retained)*body.average_order_value_usd*12
+    downtime_loss=(baseline_orders*body.average_order_value_usd/730)*body.downtime_hours
+    annual_cost=body.implementation_cost_usd+body.monthly_operating_cost_usd*12+downtime_loss
+    annual_contribution=additional_revenue*body.gross_margin_percent/100
+    net_first_year=annual_contribution-annual_cost
+    monthly_net=annual_contribution/12-body.monthly_operating_cost_usd
+    payback=round((body.implementation_cost_usd+downtime_loss)/monthly_net,1) if monthly_net>0 else None
+    return {'annual_incremental_revenue_usd':round(additional_revenue,2),
+      'annual_incremental_gross_profit_usd':round(annual_contribution,2),
+      'estimated_downtime_sales_loss_usd':round(downtime_loss,2),
+      'first_year_total_cost_usd':round(annual_cost,2),
+      'first_year_net_contribution_usd':round(net_first_year,2),
+      'payback_months':payback,
+      'confidence':'user_assumption_scenario',
+      'note':'Scenario only; not observed traffic, actual retention, a causal estimate or guaranteed earnings. Downtime assumes uniform traffic across 730 hours/month.'}
+
 class RevenueScenario(BaseModel):
     monthly_visits: int = Field(ge=0, le=100000000)
     conversion_rate_percent: float = Field(ge=0, le=100)
