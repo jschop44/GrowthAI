@@ -83,6 +83,7 @@ def register_memory_routes(app):
         return {'qdrant_configured': qdrant_configured, 'qdrant_write_and_read_verified': persisted,
                 'hugging_face_configured': hf_configured, 'neural_inference_verified': mode == 'neural',
                 'embedding_mode': mode, 'memory_storage': retrieved.get('storage'),
+                'provider_diagnostics': learning_engine.diagnose_providers(),
                 'status': 'fully_connected' if persisted and mode == 'neural' else 'partial',
                 'note': 'Diagnostic uses a synthetic record and does not expose credentials.'}
     app.include_router(router)
