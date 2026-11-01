@@ -257,6 +257,27 @@ footer {
     text-decoration: none !important;
   }
 }
+
+:root{color-scheme:dark;--accent:#82e4c4;--surface:#172d38;--border:#355360}
+body{background:radial-gradient(ellipse at top,#19404a 0%,#091820 60%);line-height:1.55}
+header{background:#0d202acc;border-color:#3c5a65}
+main{max-width:1220px;padding:34px 20px}
+main>h1{max-width:850px;letter-spacing:-1.4px;line-height:1.14}
+main>p.muted{max-width:800px;font-size:17px}
+.card{background:linear-gradient(145deg,#1b3440,#122630);border:1px solid #385662;border-radius:20px;box-shadow:0 12px 35px #0003;padding:clamp(20px,3vw,32px)}
+input,select{border-radius:11px;min-height:48px}
+button{border-radius:11px;min-height:46px}
+button:hover:not(:disabled){filter:brightness(1.09)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #b9f7df;outline-offset:3px}
+.finding{background:#10232d;border:1px solid #36515b;border-radius:14px;margin:12px 0;padding:18px}
+.finding details{margin-top:12px;border-top:1px solid #34515b;padding-top:12px}
+.finding summary{cursor:pointer;font-weight:700;color:#a9efda}
+.finding ol{line-height:1.7}
+.financial{background:#203844;border:1px solid #426673;border-radius:12px;padding:12px 15px;margin:12px 0}
+#businessMatches button{background:#1d3d47;color:#f0fff9;border:1px solid #528477}
+@media(max-width:640px){main{padding:18px 12px}.card{padding:18px}button{max-width:100%}}
+@media print{.finding,.financial{background:white!important;color:#172b36!important;border-color:#dce5e8!important}}
+
 </style>
 </head>
 <body>
