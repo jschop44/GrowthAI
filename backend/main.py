@@ -126,6 +126,49 @@ def _business_candidates(query, client):
                 break
     except (httpx.HTTPError,ValueError):
         pass
+    # DuckDuckGo's HTML endpoint offers an additional independent free discovery path.
+    # Search links are suggestions only; do not claim verified ownership.
+    if len(candidates) < 3:
+        try:
+            response=client.get('https://www.google.com/search',
+                params={'q':query+' business website','gbv':'1'},
+                headers={'User-Agent':'Mozilla/5.0','Accept':'text/html'},timeout=8)
+            if response.status_code == 200:
+                soup=BeautifulSoup(response.text[:400000],'html.parser')
+                for a in soup.select('a[href]'):
+                    href=a.get('href','')
+                    if href.startswith('/url?'):
+                        from urllib.parse import parse_qs
+                        href=parse_qs(urlparse(href).query).get('q',[''])[0]
+                    if href.startswith('https://'):
+                        host=(urlparse(href).hostname or '').lower()
+                        if not any(host==x or host.endswith('.'+x) for x in
+                           ('google.com','facebook.com','instagram.com','yelp.com','youtube.com','linkedin.com','tripadvisor.com')):
+                            add(a.get_text(' ',strip=True) or query,'',href,'Public search suggestion')
+        except (httpx.HTTPError,ValueError):
+            pass
+    if len(candidates) < 3:
+        try:
+            response=client.get('https://www.bing.com/search',
+                params={'q':'"'+query+'" official website','format':'rss'},
+                headers={'User-Agent':'Mozilla/5.0','Accept':'application/rss+xml'},timeout=9)
+            response.raise_for_status()
+            rss=ElementTree.fromstring(response.text[:250000])
+            for item in rss.findall('.//item')[:12]:
+                link=item.findtext('link','').strip()
+                title=item.findtext('title',query)
+                host=(urlparse(link).hostname or '').lower()
+                if link.startswith('https://') and not any(host==x or host.endswith('.'+x) for x in ('bing.com','facebook.com','yelp.com','linkedin.com','instagram.com','youtube.com')):
+                    add(title,'',link,'Bing search suggestion')
+        except (httpx.HTTPError,ValueError,ElementTree.ParseError):
+            pass
+    # Rank exact business-name and domain token overlap above unrelated listings.
+    tokens=set(re.findall(r'[a-z0-9]+',query.lower()))-{'the','and','llc','inc','company','business','md','usa'}
+    def relevance(item):
+        name=set(re.findall(r'[a-z0-9]+',item['name'].lower()))
+        domain=set(re.findall(r'[a-z0-9]+',(urlparse(item['website']).hostname or '').lower()))
+        return (len(tokens & name)*3+len(tokens & domain)*4, bool(item['address']))
+    candidates.sort(key=relevance,reverse=True)
     if not candidates:
         # Bing RSS offers a second search path when HTML search is blocked.
         try:
