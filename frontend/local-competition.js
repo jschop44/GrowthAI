@@ -79,10 +79,12 @@
         body:JSON.stringify({url,cik:cik||null,radius_miles:selectedRadius(),business_address:$('localAddress').value.trim()||null,industry:$('publicIndustry').value||null})});
       const data=await response.json();
       if (!response.ok) throw Error(data.detail||'Public intelligence request failed');
-      const names={website:'Website intelligence',discovery:'Competitor discovery',pagespeed_mobile:'Mobile performance',pagespeed_desktop:'Desktop performance',corporate_filings:'SEC public-company filings',verification:'Evidence verification',opportunities:'Growth opportunities'};
+      const names={website:'Website intelligence',discovery:'Competitor discovery',pagespeed_mobile:'Mobile performance',pagespeed_desktop:'Desktop performance',corporate_filings:'SEC public-company filings',crux_mobile:'Real-user mobile experience',crux_desktop:'Real-user desktop experience',verification:'Evidence verification',opportunities:'Growth opportunities'};
       $('publicIntelOutput').replaceChildren();
       const heading=document.createElement('h3');heading.textContent='Independent public intelligence';$('publicIntelOutput').append(heading);
+      const skipped=[];
       for (const [id,result] of Object.entries(data.engines||{})) {
+        if(result.status==='not_requested'||result.status==='not_configured'){skipped.push(names[id]||id);continue;}
         const paragraph=document.createElement('p');
         const label=document.createElement('strong');label.textContent=(names[id]||id)+': ';
         paragraph.append(label,document.createTextNode(result.status==='available'
@@ -102,7 +104,7 @@
       if(rivals.length){ const table=document.createElement('table'); const head=document.createElement('thead'); head.innerHTML='<tr><th>Business</th><th>Distance</th><th>Source</th></tr>';table.append(head); const body=document.createElement('tbody'); for(const rival of rivals){const tr=document.createElement('tr'); for(const value of [rival.name||'Unnamed',rival.distance_miles!=null?rival.distance_miles+' mi':'Unknown',(rival.source_providers||[rival.provider||'Public listing']).join(', ')]){const td=document.createElement('td');td.textContent=value;tr.append(td);}body.append(tr);}table.append(body);output.append(table);}
       const opportunityHeading=document.createElement('h3');opportunityHeading.textContent='Evidence-supported opportunities';output.append(opportunityHeading);
       const list=document.createElement('ul');for(const item of opportunities.recommendations||[]){const li=document.createElement('li');li.textContent=(item.issue||'Opportunity')+': '+(item.recommendation||'')+' ('+(item.evidence||'limited evidence')+')';list.append(li);}if(!list.children.length){const li=document.createElement('li');li.textContent='No verified opportunities established from available evidence.';list.append(li);}output.append(list);
-      $('publicIntelStatus').textContent='Coordinated engines complete. Missing results are not scored as zero.';
+      $('publicIntelStatus').textContent='Analysis complete. '+(skipped.length?skipped.length+' optional sources skipped (not configured or not applicable). ':'')+'Unavailable provider results are not scored as zero.';
     } catch(e) { $('publicIntelStatus').textContent=String(e.message); }
     finally { $('publicIntelRun').disabled=false; }
   };
