@@ -83,6 +83,17 @@ def register_memory_routes(app):
         if not 2 <= len(query.strip()) <= 500:
             raise HTTPException(422,'Query must be 2 to 500 characters.')
         return learning_engine.semantic_search(query,subject='https://'+domain)
+    @router.get('/api/intelligence/history-changes')
+    def history_changes(website: str):
+        domain=domain_for(website)
+        return learning_engine.compare_history('https://'+domain)
+
+    @router.get('/api/intelligence/evidence-ranking')
+    def evidence_ranking(website: str, query: str):
+        domain=domain_for(website)
+        if not 2 <= len(query.strip()) <= 500:
+            raise HTTPException(422,'Query must be 2 to 500 characters.')
+        return learning_engine.rank_evidence(query,'https://'+domain)
     @router.get('/api/intelligence/memory-health')
     def memory_health():
         # This endpoint is protected by the same private API middleware as other /api/intelligence routes.
