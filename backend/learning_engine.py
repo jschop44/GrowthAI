@@ -130,7 +130,7 @@ def store(subject,kind,data,verified=False):
         return {"stored":False,"reason":"Source required"}
     raw=json.dumps(data,default=str)
     if len(raw)>12000:return {"stored":False,"reason":"Evidence too large"}
-    record={"id":str(uuid.uuid5(uuid.NAMESPACE_URL,subject+kind+raw)),"subject":subject,"kind":kind,"data":data,"recorded":int(time.time()),"verified":bool(verified)}
+    record={"id":str(uuid.uuid5(uuid.NAMESPACE_URL,subject+kind+raw)),"subject":subject,"kind":kind,"data":data,"recorded":int(time.time()),"verified":bool(verified),"model_version":MODEL if os.getenv("QDRANT_URL") else "deterministic-v1","evaluation_status":"eligible" if verified else "unverified"}
     text=subject+" "+kind+" "+raw
     neural,neural_reason=neural_upsert(record,text)
     vector,mode=vectorize(text) if not neural else ([0.0]*DIM,"neural")
@@ -182,3 +182,10 @@ def recall(subject,limit=12):
         return {"storage":"ephemeral","observations":[{"id":x[0],"subject":subject,"kind":x[1],"data":json.loads(x[2]),"recorded":x[3],"verified":bool(x[4])} for x in rows]}
     except (sqlite3.Error,ValueError):
         return {"storage":"unavailable","observations":[]}
+
+def evaluation_summary(subject):
+    """Only independently verified evidence can enter an evaluated recommendation set."""
+    result=recall(subject,limit=25)
+    observations=result.get("observations",[])
+    verified=sum(1 for item in observations if item.get("verified") is True)
+    return {"subject":subject,"observations_examined":len(observations),"verified_evidence":verified,"unverified_evidence":len(observations)-verified,"eligible_for_evaluated_recommendations":verified,"model_version":MODEL,"storage":result.get("storage"),"automatic_retraining":False}
