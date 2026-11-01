@@ -22,7 +22,7 @@ def observed_features(html, industry, source_url=None):
     observed_at = datetime.now(timezone.utc).isoformat()
     output = {}
     for name, terms in SIGNALS.get(industry or "", {}).items():
-        found = any(re.search(r"(?<!\\w)" + re.escape(term) + r"(?!\\w)", haystack) for term in terms)
+        found = any(re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", haystack) for term in terms)
         output[name] = {
             "observed": bool(found),
             "status": "observed" if found else "not_observed_on_page",
