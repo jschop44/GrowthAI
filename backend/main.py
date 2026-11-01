@@ -237,6 +237,23 @@ def analyze_html(html, url, elapsed_ms):
       ('link_labels','Descriptive link labels',generic_links==0,'Replace generic link text with meaningful destination labels.'),
       ('form_accessibility','Accessible form fields',unlabeled_inputs==0,'Associate each form field with a label.')
     ]
+    nav=bool(soup.find('nav') or soup.find(attrs={'role':'navigation'}))
+    logo=bool(soup.find('img',alt=re.compile('logo',re.I)) or soup.find('link',rel=lambda v:v and 'icon' in v))
+    contacts=bool(soup.find('a',href=re.compile(r'^(tel:|mailto:)',re.I)))
+    cta_words=re.compile(r'(book|schedule|reserve|order|shop|request|contact|quote|buy|get started)',re.I)
+    cta=bool(soup.find('a',string=cta_words) or soup.find('button',string=cta_words))
+    faq=bool(soup.find(string=re.compile(r'frequently asked questions|\bfaq\b',re.I)))
+    trust=bool(soup.find(string=re.compile(r'testimonials|customer reviews|our clients',re.I)))
+    search=bool(soup.find('input',attrs={'type':'search'}) or soup.find(attrs={'role':'search'}))
+    extra_checks.extend([
+      ('navigation','Clear navigation',nav,'Add a semantic navigation menu linking to key pages.'),
+      ('branding','Recognizable brand identity',logo,'Add a meaningful brand logo and favicon.'),
+      ('contact','Tap-to-contact options',contacts,'Add visible telephone and email links.'),
+      ('conversion_cta','Clear conversion action',cta,'Provide a prominent booking, ordering or contact action.'),
+      ('faq','Customer questions answered',faq,'Publish a helpful FAQ addressing real customer concerns.'),
+      ('trust','Trust and social proof',trust,'Feature authentic customer reviews or case studies with permission.'),
+      ('site_search','Site search feature',search,'Consider search for larger sites with many products or services.')
+    ])
     findings.extend({'id':key,'name':name,'passed':passed,'weight':0,
                      'category':'Expanded diagnostics (unscored)','recommendation':rec}
                     for key,name,passed,rec in extra_checks)
@@ -261,8 +278,41 @@ def analyze_html(html, url, elapsed_ms):
         finding['implementation_steps']=implementation.get(finding['id'],[])
         finding['priority']='high' if not finding['passed'] and finding['weight']>=12 else 'medium' if not finding['passed'] else 'passed'
         finding['verification']='Publish changes and re-run the website audit.'
+    implementation.update({
+      'navigation':['Identify the pages customers need most: services, pricing, about and contact.','Build a short semantic navigation menu with descriptive labels.','Ensure the mobile menu is keyboard accessible.','Test navigation on phones and desktop.'],
+      'branding':['Prepare a crisp logo with accessible text.','Place the logo in the header and link it to the homepage.','Add a favicon in site settings.','Check mobile and browser tab appearance.'],
+      'contact':['Add accurate business phone and email information.','Use tel: and mailto: links for mobile visitors.','Test both links on a phone.'],
+      'conversion_cta':['Select one primary action such as Book, Order or Request a quote.','Place a descriptive high-contrast button near the top of the page.','Connect it to a working booking, order or contact flow.','Test the full flow on mobile.'],
+      'faq':['Collect common customer questions.','Publish concise, accurate answers on relevant pages.','Review answers regularly.'],
+      'trust':['Collect permission to display genuine customer reviews.','Add authentic quotes with appropriate attribution.','Avoid fabricated ratings or unsupported claims.'],
+      'site_search':['Decide whether the site has enough content to benefit from search.','Add an accessible search field and relevant index if warranted.','Provide useful empty-result guidance.','Test common queries.']
+    })
+    # Illustrative assumptions, not measured performance or promised returns.
+    costs={
+      'title':(150,450,.015),'description':(100,300,.012),'h1':(100,250,.01),
+      'viewport':(300,1400,.07),'https':(100,600,.02),'canonical':(100,400,.01),
+      'image_alt':(100,600,.008),'structured_data':(200,900,.015),
+      'internal_links':(150,650,.015),'language':(40,140,.003),
+      'social_title':(50,200,.004),'social_image':(100,350,.006),
+      'headings':(100,350,.008),'link_labels':(100,400,.008),
+      'form_accessibility':(150,800,.018),'navigation':(300,1800,.045),
+      'branding':(150,1200,.012),'contact':(100,500,.025),
+      'conversion_cta':(200,1200,.06),'faq':(200,850,.02),
+      'trust':(200,1200,.035),'site_search':(400,2500,.012)}
+    for finding in findings:
+        low,high,lift=costs.get(finding['id'],(100,500,.01))
+        revenue=1000*12*.02*100*lift
+        finding['financial_scenario']={
+          'implementation_cost_usd':{'low':low,'high':high},
+          'annual_incremental_revenue_usd':round(revenue),
+          'annual_incremental_contribution_usd':round(revenue*.20),
+          'assumptions':{'monthly_visits':1000,'conversion_rate':.02,
+            'revenue_per_conversion_usd':100,'contribution_margin':.20,
+            'hypothetical_relative_conversion_lift':lift},
+          'confidence':'illustrative_only',
+          'note':'Not a forecast. Actual traffic, downtime, retention and conversion impact were not measured. Do not add estimates across recommendations.'}
     score = sum(f['weight'] for f in findings if f['passed'])
-    return {'url':url,'score':score,'max_score':100,'scoring_scope':'Single-page on-page technical checks; not an overall business growth score','findings':findings,'observations':{'title':title,'meta_description':description,'h1_count':len(h1s),'image_count':len(imgs),'images_missing_alt':missing_alt,'internal_link_count':internal_links,'structured_data_blocks':structured,'fetch_elapsed_ms':round(elapsed_ms),'heading_counts':heading_counts,'document_language':lang,'generic_link_count':generic_links,'unlabeled_inputs':unlabeled_inputs,'social_title_present':bool(og_title),'social_image_present':bool(og_image)},'limitations':['Only the supplied page is analyzed, not the whole site.','No search rankings, traffic, competitor revenue, social accounts, logo quality, or AI search visibility are measured.','Fetch time is not a Lighthouse or Core Web Vitals score.']}
+    return {'url':url,'score':score,'max_score':100,'scoring_scope':'Single-page on-page technical checks; not an overall business growth score','findings':findings,'observations':{'title':title,'meta_description':description,'h1_count':len(h1s),'image_count':len(imgs),'images_missing_alt':missing_alt,'internal_link_count':internal_links,'structured_data_blocks':structured,'fetch_elapsed_ms':round(elapsed_ms),'heading_counts':heading_counts,'document_language':lang,'generic_link_count':generic_links,'unlabeled_inputs':unlabeled_inputs,'social_title_present':bool(og_title),'social_image_present':bool(og_image),'navigation_detected':nav,'branding_detected':logo,'contact_links_detected':contacts,'primary_action_detected':cta,'faq_detected':faq,'trust_signals_detected':trust,'site_search_detected':search},'limitations':['Only the supplied page is analyzed, not the whole site.','No search rankings, traffic, competitor revenue, social accounts, logo quality, or AI search visibility are measured.','Fetch time is not a Lighthouse or Core Web Vitals score.']}
 
 def robots_allowed(client,url):
     parsed=urlparse(url)
