@@ -1,5 +1,6 @@
 """GrowthLens AI local competitor intelligence, free public-data extension."""
 import json
+from concurrent.futures import ThreadPoolExecutor
 import math
 import re
 import time
@@ -234,12 +235,25 @@ def osm_competitors(client, lat, lon, classification, host, radius_miles):
 
 
 def discover_competitors(client, lat, lon, classification, host, radius_miles):
-    """Geoapify when configured; Overpass otherwise. Both are OSM-derived data."""
-    raw, provider_warning = geoapify_places(client, lat, lon, classification, radius_miles)
-    if raw is None:
-        candidates, osm_warning = osm_competitors(client, lat, lon, classification, host, radius_miles)
-        provenance = "OpenStreetMap contributors via Overpass API (Geoapify not configured or unavailable)"
-        return candidates, osm_warning, provenance
+    """Query Geoapify and Overpass concurrently; reconcile OSM-derived listings.
+
+    Sources share OpenStreetMap ancestry, so agreement is corroboration of
+    listing identity, not independent validation of the real-world business.
+    """
+    def geo_task():
+        with httpx.Client(trust_env=False) as geo_client:
+            return geoapify_places(geo_client, lat, lon, classification, radius_miles)
+    def osm_task():
+        with httpx.Client(trust_env=False) as osm_client:
+            return osm_competitors(osm_client, lat, lon, classification, host, radius_miles)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        geo_future = executor.submit(geo_task)
+        osm_future = executor.submit(osm_task)
+        try: raw, geo_warning = geo_future.result()
+        except Exception: raw, geo_warning = None, "Geoapify request failed"
+        try: osm_rows, osm_warning = osm_future.result()
+        except Exception: osm_rows, osm_warning = [], "Overpass request failed"
+    if raw is None: raw = []
     candidates, seen = [], set()
     key = classification.get('key')
     for row in raw:
@@ -270,11 +284,39 @@ def discover_competitors(client, lat, lon, classification, host, radius_miles):
             'source_url':row.get('source_url'),
             'match_reason':'Provider category and name-based specialty filter; verify manually',
         })
-    candidates.sort(key=lambda x:(x['distance_miles'],x['name']))
-    if candidates:
-        return candidates[:20],None,'Geoapify places (OpenStreetMap-derived)'
-    fallback,osm_warning = osm_competitors(client,lat,lon,classification,host,radius_miles)
-    return fallback,osm_warning or provider_warning,'OpenStreetMap via Overpass (Geoapify yielded no reliable matches)'
+    # Deduplicate by normalized domain or geographically close matching names.
+    # Do not merge branches of a chain solely because they share a domain.
+    merged = []
+    for row in candidates + osm_rows:
+        domain = ((urlparse(row.get('website') or '').hostname or '').lower().removeprefix('www.'))
+        normalized = re.sub(r'[^a-z0-9]+', '', row.get('name','').lower())
+        match = None
+        for existing in merged:
+            other_domain = ((urlparse(existing.get('website') or '').hostname or '').lower().removeprefix('www.'))
+            other_name = re.sub(r'[^a-z0-9]+', '', existing.get('name','').lower())
+            if (normalized and normalized == other_name and abs(row['distance_miles'] - existing['distance_miles']) <= 0.3):
+                match = existing
+                break
+        source = 'Geoapify' if row.get('provider') else 'Overpass'
+        if match:
+            match['source_providers'] = sorted(set(match['source_providers'] + [source]))
+            if not match.get('website') and row.get('website'):
+                match['website'] = row['website']
+        else:
+            merged.append({**row, 'source_providers': [source],
+                           'provider': row.get('provider') or 'Overpass (OpenStreetMap)'})
+    merged.sort(key=lambda x: (x['distance_miles'], x['name']))
+    geo_ok = geo_warning is None or raw != []
+    osm_ok = not (osm_warning and ('unavailable' in osm_warning.lower() or 'failed' in osm_warning.lower()))
+    coverage = ('Geoapify ' + ('responded' if geo_ok else 'unavailable') +
+                '; Overpass ' + ('responded' if osm_ok else 'unavailable') +
+                '; both OpenStreetMap-derived; sources merged by business name and proximity')
+    if not geo_ok and not osm_ok:
+        return [], 'Both competitor listing providers were unavailable; competitor count is unknown.', coverage
+    warning = None if merged else 'No matching listings in responding public sources; competitor count is not exhaustive.'
+    if merged and (not geo_ok or not osm_ok):
+        warning = 'Partial provider coverage: one listing provider was unavailable.'
+    return merged[:20], warning, coverage
 
 def industry_recommendations(classification, html):
     """Evidence-limited, industry-specific checks; absence on homepage is not absence on entire site."""
