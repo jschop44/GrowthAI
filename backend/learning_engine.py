@@ -183,6 +183,36 @@ def recall(subject,limit=12):
     except (sqlite3.Error,ValueError):
         return {"storage":"unavailable","observations":[]}
 
+def backup_verify(record_id, subject):
+    """Confirm that the same persisted record is independently readable from Postgres."""
+    records=backup_read(subject,25)
+    return records is not None and any(
+        isinstance(item,dict) and item.get("id")==record_id for item in records)
+
+def semantic_search(query, subject=None, limit=8):
+    """Qdrant Cloud's free inference model ranks existing neural evidence."""
+    cfg=config()
+    if not cfg:return {"status":"unavailable","reason":"qdrant_not_configured","results":[]}
+    url,headers=cfg
+    if not isinstance(query,str) or not query.strip():
+        return {"status":"invalid_query","results":[]}
+    payload={"query":{"text":query[:2500],"model":MODEL},
+             "limit":max(1,min(limit,20)),"with_payload":True}
+    if subject:payload["filter"]={"must":[{"key":"subject","match":{"value":subject}}]}
+    try:
+        with httpx.Client(timeout=15,trust_env=False) as client:
+            r=client.post(url+"/collections/"+COLLECTION_NEURAL+"/points/query",
+                          headers=headers,json=payload)
+            r.raise_for_status()
+        points=r.json()["result"]["points"]
+        return {"status":"available","model":MODEL,"results":[
+            {"score":p.get("score"),"record":p.get("payload")} for p in points
+            if isinstance(p.get("payload"),dict)]}
+    except httpx.HTTPStatusError as exc:
+        return {"status":"unavailable","reason":"http_"+str(exc.response.status_code),"results":[]}
+    except (httpx.HTTPError,ValueError,KeyError,TypeError):
+        return {"status":"unavailable","reason":"provider_error","results":[]}
+
 def evaluation_summary(subject):
     """Only independently verified evidence can enter an evaluated recommendation set."""
     result=recall(subject,limit=25)
