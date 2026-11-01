@@ -270,7 +270,7 @@ footer {
   <h1>Find your website's growth opportunities.</h1>
   <p class="muted">
     Analyze a public webpage, identify technical SEO issues,
-    and explore hypothetical revenue improvements.
+    and explore verified competitor and public-data intelligence.
   </p>
 
   <section class="card">
@@ -300,29 +300,7 @@ footer {
       <p id="status" role="status"></p>
     </section>
 
-    <section class="card">
-      <h2>Revenue Scenario</h2>
-      <form id="revenueForm">
-        <label for="visitors">Monthly visitors</label>
-        <input id="visitors" type="number" min="0"
-          value="10000" required>
 
-        <label for="conversion">Conversion rate (%)</label>
-        <input id="conversion" type="number"
-          min="0" max="100" step="0.1" value="2" required>
-
-        <label for="value">Revenue per conversion ($)</label>
-        <input id="value" type="number"
-          min="0" step="0.01" value="150" required>
-
-        <label for="improvement">Assumed improvement (%)</label>
-        <input id="improvement" type="number"
-          min="0" max="1000" value="20" required>
-
-        <button type="submit">Calculate Scenario</button>
-      </form>
-      <div id="revenueResult"></div>
-    </section>
   </div>
 
   <section class="card hidden" id="results">
@@ -646,36 +624,6 @@ $("auditForm").onsubmit = async e => {
   }
 };
 
-$("revenueForm").onsubmit = async e => {
-  e.preventDefault();
-
-  try {
-    const data = await api("/api/revenue-scenario", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        monthly_visits: Number($("visitors").value),
-        conversion_rate_percent: Number($("conversion").value),
-        revenue_per_conversion: Number($("value").value),
-        improvement_percent: Number($("improvement").value)
-      })
-    });
-
-    $("revenueResult").innerHTML =
-      "<h3 class='ok'>" +
-      money(data.additional_annual_revenue) +
-      " additional annual revenue</h3>" +
-      "<p>Baseline: " +
-      money(data.baseline_annual_revenue) +
-      "</p><p>Projected: " +
-      money(data.projected_annual_revenue) +
-      "</p><p class='muted small'>" +
-      esc(data.disclaimer) +
-      "</p>";
-  } catch (err) {
-    $("revenueResult").textContent = err.message;
-  }
-};
 
 $("privateKey").addEventListener("change", loadHistory);
 
