@@ -100,6 +100,7 @@
         <p><strong>Verified visits:</strong> Unavailable. ${esc(data.traffic.status)}</p>
         <p><strong>Verified revenue opportunity:</strong> Unavailable. ${esc(data.revenue.status)}</p>
         <p class="localNote">${esc(data.limitations.join(' '))}</p>`;
+      panel.dispatchEvent(new CustomEvent('growthlens:report', {detail:data}));
       $('localStatus').textContent=`Local ${data.radius_miles}-mile analysis complete. You can print this section with the main report.`;
     } catch(e) { $('localStatus').textContent=e.message; }
     finally { $('localRun').disabled=false; }
