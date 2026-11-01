@@ -29,7 +29,7 @@
     <div id="publicIntelOutput"></div>
     <div id="localOutput"></div>
     <h3>Neural memory connection</h3>
-    <button id="memoryHealthRun" type="button">Test Qdrant &amp; Hugging Face</button>
+    <button id="memoryHealthRun" type="button">Test Neural Memory &amp; Backup</button>
     <p id="memoryHealthStatus" class="muted" role="status"></p>
     <h3>Learning feedback (optional)</h3>
     <p class="muted small">Save a correction or verified-by-you observation. This is not independently verified and may be lost on free hosting.</p>
@@ -124,7 +124,7 @@
       if(rivals.length){ const table=document.createElement('table'); const head=document.createElement('thead'); head.innerHTML='<tr><th>Business</th><th>Distance</th><th>Source</th></tr>';table.append(head); const body=document.createElement('tbody'); for(const rival of rivals){const tr=document.createElement('tr'); for(const value of [rival.name||'Unnamed',rival.distance_miles!=null?rival.distance_miles+' mi':'Unknown',(rival.source_providers||[rival.provider||'Public listing']).join(', ')]){const td=document.createElement('td');td.textContent=value;tr.append(td);}body.append(tr);}table.append(body);output.append(table);}
       const opportunityHeading=document.createElement('h3');opportunityHeading.textContent='Evidence-supported opportunities';output.append(opportunityHeading);
       const list=document.createElement('ul');for(const item of opportunities.recommendations||[]){const li=document.createElement('li');li.textContent=(item.issue||'Opportunity')+': '+(item.recommendation||'')+' ('+(item.evidence||'limited evidence')+')';list.append(li);}if(!list.children.length){const li=document.createElement('li');li.textContent='No verified opportunities established from available evidence.';list.append(li);}output.append(list);
-      if(data.memory){const memory=document.createElement('p');memory.className='muted';memory.textContent='Intelligence memory: '+data.memory.prior_observations+' previous observations; '+data.memory.new_observations+' new; '+(data.memory.persistent?'persistent Qdrant':'temporary local storage')+'; '+(data.memory.neural_embeddings?'neural embeddings':'deterministic embeddings (neural inference not configured)')+'.';$('publicIntelOutput').append(memory);}
+      if(data.memory){const memory=document.createElement('p');memory.className='muted';memory.textContent='Intelligence memory: '+data.memory.prior_observations+' previous observations; '+data.memory.new_observations+' new; '+(data.memory.persistent?'persistent storage':'temporary local storage')+'; '+(data.memory.neural_embeddings?'neural embeddings':'deterministic embeddings (neural inference unavailable)')+'.';$('publicIntelOutput').append(memory);}
       $('publicIntelStatus').textContent='Analysis complete. '+(skipped.length?skipped.length+' optional sources skipped (not configured or not applicable). ':'')+'Unavailable provider results are not scored as zero.';
     } catch(e) { $('publicIntelStatus').textContent=String(e.message); }
     finally { $('publicIntelRun').disabled=false; }
