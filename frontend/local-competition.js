@@ -31,11 +31,6 @@
     <h3>Data protection &amp; connection</h3><p class="muted small">Connection and backup checks run automatically.</p>
     <button id="memoryHealthRun" type="button" style="display:none">Check connection</button>
     <p id="memoryHealthStatus" class="muted" role="status"></p>
-    <h3>Learning feedback (optional)</h3>
-    <p class="muted small">Save a correction or observation. User feedback is not independently verified; durable storage is checked separately.</p>
-    <label for="learningField">Field</label><select id="learningField" style="padding:10px;background:#0c1d27;color:white"><option value="industry">Industry</option><option value="name">Business name</option><option value="address">Address</option><option value="service">Service</option><option value="correction">Other correction</option></select>
-    <label for="learningValue">Correction or observation</label><input id="learningValue" maxlength="300" placeholder="e.g. Pizza restaurant">
-    <button type="button" id="learningSave">Record feedback</button><p id="learningStatus" role="status"></p>
     <h3>Neural intelligence &amp; outcomes</h3>
     <p class="muted">Search saved evidence, compare historical observations, and record measured outcomes. Results retain their verification status.</p>
     <label for="neuralQuery">Evidence question</label><input id="neuralQuery" maxlength="500" placeholder="e.g. Website performance and local competitors">
@@ -99,15 +94,6 @@
   $('privateKey')?.addEventListener('change',autoHealth);
   setInterval(()=>{lastHealthKey='';autoHealth();},30*60*1000);
   autoHealth();
-  $('learningSave').onclick = async () => {
-    const key=$('privateKey')?.value.trim(), website=$('url')?.value.trim(), value=$('learningValue').value.trim();
-    if (!key || !website || !value) { $('learningStatus').textContent='Enter the access key, website, and feedback.'; return; }
-    try {
-      const r=await fetch('/api/intelligence/evidence',{method:'POST',headers:{'Content-Type':'application/json','X-GrowthLens-Key':key},body:JSON.stringify({website,field:$('learningField').value,value})});
-      const d=await r.json(); if (!r.ok) throw Error(d.detail || 'Could not save feedback');
-      $('learningStatus').textContent='Feedback recorded as user-asserted (not independently verified). Persistence: '+(d.durable?'durable':'not verified')+'.';
-    } catch(e) { $('learningStatus').textContent=String(e.message); }
-  };
   const intelGet=async path=>{
     const key=$('privateKey')?.value.trim(),website=$('url')?.value.trim();
     if(!key||!website)throw Error('Enter the access key and website first.');
