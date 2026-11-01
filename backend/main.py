@@ -295,3 +295,9 @@ def local_competition_script():
         os.path.join(ROOT, 'frontend', 'local-competition.js'),
         media_type='application/javascript'
     )
+@app.get('/local-premium.js')
+def local_premium_script():
+    return FileResponse(
+        os.path.join(ROOT, 'frontend', 'local-premium.js'),
+        media_type='application/javascript'
+    )
