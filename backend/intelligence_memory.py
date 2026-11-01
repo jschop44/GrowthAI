@@ -82,8 +82,8 @@ def register_memory_routes(app):
             item.get('kind') == 'connection_test' for item in retrieved.get('observations', []))
         return {'qdrant_configured': qdrant_configured, 'qdrant_write_and_read_verified': persisted,
                 'hugging_face_configured': hf_configured, 'neural_inference_verified': mode == 'neural',
-                'embedding_mode': mode, 'memory_storage': retrieved.get('storage'),
+                'embedding_mode': mode, 'free_embedding_fallback': mode == 'deterministic', 'memory_storage': retrieved.get('storage'),
                 'provider_diagnostics': learning_engine.diagnose_providers(),
-                'status': 'fully_connected' if persisted and mode == 'neural' else 'partial',
+                'status': 'persistent_free_memory_active' if persisted and mode == 'deterministic' else 'fully_connected' if persisted and mode == 'neural' else 'partial',
                 'note': 'Diagnostic uses a synthetic record and does not expose credentials.'}
     app.include_router(router)
