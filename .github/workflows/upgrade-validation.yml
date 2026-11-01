@@ -1,7 +1,7 @@
 name: GrowthLens upgrade validation
 on:
   push:
-    branches: [growthlens-v1-1-review]
+    branches: [growthlens-v1-1-review, main]
   pull_request:
     branches: [main]
 jobs:
