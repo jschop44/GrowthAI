@@ -156,7 +156,7 @@ def register_memory_routes(app):
                 'provider_diagnostics': learning_engine.diagnose_providers(),
                 'status': 'fully_connected' if persisted and outcome.get('embedding') == 'neural' else 'persistent_free_memory_active' if persisted else 'partial',
                 'note': 'Diagnostic uses a synthetic record and does not expose credentials.'}
-    app.include_router(router))
+    app.include_router(router)
     source_url: str = Field(min_length=8,max_length=2048)
     note: str = Field(default='',max_length=300)
 
