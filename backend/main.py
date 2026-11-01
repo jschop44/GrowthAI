@@ -275,7 +275,7 @@ def analyze_html(html, url, elapsed_ms):
       'form_accessibility':['Find inputs without visible labels.','Associate each input with a matching label for/id or accessible name.','Test keyboard and screen-reader usability.']
     }
     for finding in findings:
-        finding['implementation_steps']=implementation.get(finding['id'],[])
+        finding['implementation_steps']=implementation.get(finding['id'],['Open the relevant page in your website editor.','Apply the recommended change and publish it.','Check the live page and repeat the audit to confirm the result.'])
         finding['priority']='high' if not finding['passed'] and finding['weight']>=12 else 'medium' if not finding['passed'] else 'passed'
         finding['verification']='Publish changes and re-run the website audit.'
     implementation.update({
