@@ -19,7 +19,7 @@
     <label for="localAddress" style="display:block;margin:10px 0 4px">Business street address (optional; use if website location is missing or incorrect)</label>
     <input id="localAddress" type="text" maxlength="220" placeholder="Street, city, state, ZIP" style="width:100%;max-width:520px;padding:9px;box-sizing:border-box">
     <button id="localRun" type="button">Analyze Local Competition (15 miles)</button>
-    <p id="localStatus" class="muted" role="status"></p>
+    <p id="localStatus" class="muted" role="status"></p>\n    <button id="publicIntelRun" type="button">Analyze public sources (no website crawling)</button>\n    <label for="publicCik" style="display:block;margin-top:8px">SEC CIK (optional, for public corporations)</label>\n    <input id="publicCik" type="text" maxlength="10" inputmode="numeric" placeholder="Company CIK, if known">\n    <p id="publicIntelStatus" class="muted" role="status"></p>\n    <div id="publicIntelOutput"></div>
     <div id="localOutput"></div>
     <h3>Learning feedback (optional)</h3>
     <p class="muted small">Save a correction or verified-by-you observation. This is not independently verified and may be lost on free hosting.</p>
@@ -59,6 +59,35 @@
       const d=await r.json(); if (!r.ok) throw Error(d.detail || 'Could not save feedback');
       $('learningStatus').textContent='Feedback recorded as user-asserted (not independently verified). Free-host storage is temporary.';
     } catch(e) { $('learningStatus').textContent=String(e.message); }
+  };
+  $('publicIntelRun').onclick = async () => {
+    const key=$('privateKey')?.value.trim(), url=$('url')?.value.trim(), cik=$('publicCik').value.trim();
+    if (!key || !url) { $('publicIntelStatus').textContent='Enter your access key and website URL first.'; return; }
+    $('publicIntelRun').disabled=true;
+    $('publicIntelStatus').textContent='Querying independent public-data providers concurrently...';
+    try {
+      const response=await fetch('/api/public-intelligence',{method:'POST',
+        headers:{'Content-Type':'application/json','X-GrowthLens-Key':key},
+        body:JSON.stringify({url,cik:cik||null})});
+      const data=await response.json();
+      if (!response.ok) throw Error(data.detail||'Public intelligence request failed');
+      const names={pagespeed_mobile:'Mobile performance',pagespeed_desktop:'Desktop performance',corporate_filings:'SEC public-company filings'};
+      $('publicIntelOutput').replaceChildren();
+      const heading=document.createElement('h3');heading.textContent='Independent public intelligence';$('publicIntelOutput').append(heading);
+      for (const [id,result] of Object.entries(data.engines||{})) {
+        const paragraph=document.createElement('p');
+        const label=document.createElement('strong');label.textContent=(names[id]||id)+': ';
+        paragraph.append(label,document.createTextNode(result.status==='available'
+          ? (result.performance_score!=null?result.performance_score+'/100 lab performance score':result.company_name||'Public filing found')
+          : (result.reason||result.status)));
+        if (result.evidence_url && /^https:\/\//.test(result.evidence_url)) {
+          const link=document.createElement('a');link.href=result.evidence_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=' · Source';paragraph.append(link);
+        }
+        $('publicIntelOutput').append(paragraph);
+      }
+      $('publicIntelStatus').textContent='Provider results complete. Missing results are not scored as zero.';
+    } catch(e) { $('publicIntelStatus').textContent=String(e.message); }
+    finally { $('publicIntelRun').disabled=false; }
   };
   $('localRun').onclick = async () => {
     const key = $('privateKey')?.value.trim();
