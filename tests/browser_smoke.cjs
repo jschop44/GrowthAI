@@ -42,6 +42,25 @@ const { chromium } = require('playwright');
       if (await page.locator('#glVisits').count()) throw Error('Manual financial calculator should be removed');
       if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 3))
         throw Error('Report overflows mobile viewport '+viewport.width);
+      // A blocked robots check must fall back to permitted public providers.
+      await page.route('**/api/audits', route => {
+        if(route.request().method()==='POST') return route.fulfill({status:422,contentType:'application/json',
+          body:JSON.stringify({detail:'Website robots.txt does not permit this audit, or could not be checked.'})});
+        return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+      });
+      await page.route('**/api/public-intelligence', route => route.fulfill({
+        status:200,contentType:'application/json',
+        body:JSON.stringify({status:'completed_with_independent_provider_results',
+          engines:{pagespeed_mobile:{status:'available',performance_score:86},
+            pagespeed_desktop:{status:'unavailable',reason:'No provider data'},
+            corporate_filings:{status:'not_requested'}}})
+      }));
+      await page.locator('#url').fill('https://apple.com');
+      await page.locator('#auditButton').click();
+      await page.locator('#status').getByText('Independent public-source results',{exact:false}).waitFor();
+      const fallbackText=await page.locator('#status').innerText();
+      if(!fallbackText.includes('86/100') || !fallbackText.includes('not a completed website audit'))
+        throw Error('Blocked audit public-data fallback not displayed correctly');
       if (errors.length) throw Error('Browser errors: '+errors.join('; '));
       await page.close();
     }
