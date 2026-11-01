@@ -145,14 +145,23 @@ def register_memory_routes(app):
             next((item.get('id') for item in retrieved.get('observations', []) if item.get('kind') == 'connection_test'), ''), subject) if outcome.get('postgres_backup') else False
         persisted = outcome.get('persistent', False) and retrieved.get('storage') in ('qdrant', 'qdrant_neural') and any(
             item.get('kind') == 'connection_test' for item in retrieved.get('observations', []))
+        semantic=learning_engine.semantic_search('GrowthLens memory connection test',subject=subject,limit=5)
+        expected_id=next((item.get('id') for item in retrieved.get('observations',[])
+                          if item.get('kind')=='connection_test'),None)
+        semantic_verified=semantic.get('status')=='available' and any(
+            item.get('record',{}).get('id')==expected_id for item in semantic.get('results',[]))
+        full_verified=bool(persisted and outcome.get('embedding')=='neural'
+                           and backup_read_verified and semantic_verified)
         return {'postgres_backup_configured':bool(os.getenv('NEON_DATABASE_URL') or os.getenv('DATABASE_URL')),
                 'postgres_backup_verified':backup_read_verified,
+                'cross_provider_record_match':bool(persisted and backup_read_verified),
+                'qdrant_semantic_search_verified':semantic_verified,
                 'postgres_backup_write_verified':outcome.get('postgres_backup',False),
                 'postgres_backup_read_verified':backup_read_verified,
                 'qdrant_configured': qdrant_configured, 'qdrant_write_and_read_verified': persisted,
                 'neural_inference_verified': outcome.get('embedding') == 'neural',
                 'embedding_mode': outcome.get('embedding'), 'free_embedding_fallback': outcome.get('embedding') == 'deterministic', 'memory_storage': retrieved.get('storage'),
                 'provider_diagnostics': learning_engine.diagnose_providers(),
-                'status': 'fully_connected' if persisted and outcome.get('embedding') == 'neural' else 'persistent_free_memory_active' if persisted else 'partial',
+                'status': 'fully_connected' if full_verified else 'partial',
                 'note': 'Diagnostic uses a synthetic record and does not expose credentials.'}
     app.include_router(router)
