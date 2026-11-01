@@ -74,7 +74,7 @@
       $('memoryHealthStatus').textContent=
         'Qdrant: '+(d.qdrant_write_and_read_verified?'verified persistent read/write':d.qdrant_configured?'configured but connection test failed':'not configured')+
         '. Hugging Face: '+(d.neural_inference_verified?'verified neural embeddings':d.hugging_face_configured?'configured but neural inference failed':'not configured')+
-        '. Overall: '+d.status+'.';
+        '. Overall: '+d.status+'. '+Object.entries(d.provider_diagnostics||{}).map(([name,info])=>name+': '+(info.http_status?'HTTP '+info.http_status:info.error_type||'not configured')).join('; ')+'.';
     }catch(e){$('memoryHealthStatus').textContent=String(e.message);}
     finally{$('memoryHealthRun').disabled=false;}
   };
