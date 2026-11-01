@@ -61,6 +61,16 @@ const { chromium } = require('playwright');
       const fallbackText=await page.locator('#status').innerText();
       if(!fallbackText.includes('86/100') || !fallbackText.includes('not a completed website audit'))
         throw Error('Blocked audit public-data fallback not displayed correctly');
+      await page.route('**/api/business-lookup', route => route.fulfill({
+        status:200,contentType:'application/json',body:JSON.stringify({status:'matches',matches:[
+          {name:'Sample Pizza',address:'Main Street, Bel Air',website:'https://example.com'}
+        ]})
+      }));
+      await page.locator('#url').fill('Sample Pizza Bel Air');
+      await page.locator('#auditButton').click();
+      await page.locator('#businessMatches').getByText('Sample Pizza',{exact:false}).waitFor();
+      if(!(await page.locator('#businessMatches').innerText()).includes('Main Street'))
+        throw Error('Business selection lacks distinguishing address');
       if (errors.length) throw Error('Browser errors: '+errors.join('; '));
       await page.close();
     }
