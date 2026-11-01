@@ -11,6 +11,7 @@ import socket
 import sqlite3
 import time
 from contextlib import contextmanager
+from xml.etree import ElementTree
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
