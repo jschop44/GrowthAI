@@ -19,7 +19,7 @@
     <label for="localAddress" style="display:block;margin:10px 0 4px">Business street address (optional; use if website location is missing or incorrect)</label>
     <input id="localAddress" type="text" maxlength="220" placeholder="Street, city, state, ZIP" style="width:100%;max-width:520px;padding:9px;box-sizing:border-box">
     <button id="localRun" type="button">Analyze Local Competition (15 miles)</button>
-    <p id="localStatus" class="muted" role="status"></p>\n    <button id="publicIntelRun" type="button">Run coordinated intelligence team</button>\n    <label for="publicCik" style="display:block;margin-top:8px">SEC CIK (optional, for public corporations)</label>\n    <input id="publicCik" type="text" maxlength="10" inputmode="numeric" placeholder="Company CIK, if known">\n    <p id="publicIntelStatus" class="muted" role="status"></p>\n    <div id="publicIntelOutput"></div>
+    <p id="localStatus" class="muted" role="status"></p>\n    <label for="publicIndustry" style="display:block;margin-top:8px">Business industry (optional; enables discovery when website blocks audits)</label>\n    <select id="publicIndustry"><option value="">Detect from website</option><option value="pizza">Pizza restaurant</option><option value="restaurant">Restaurant</option><option value="roofing">Roofing</option><option value="dentist">Dentist</option><option value="plumber">Plumber</option><option value="electrician">Electrician</option><option value="hair">Hair salon</option><option value="auto">Auto repair</option><option value="hotel">Hotel</option><option value="pharmacy">Pharmacy</option><option value="landscaping">Landscaping</option><option value="hvac">HVAC</option><option value="bakery">Bakery</option><option value="coffee">Coffee shop</option></select>\n    <button id="publicIntelRun" type="button">Run coordinated intelligence team</button>\n    <label for="publicCik" style="display:block;margin-top:8px">SEC CIK (optional, for public corporations)</label>\n    <input id="publicCik" type="text" maxlength="10" inputmode="numeric" placeholder="Company CIK, if known">\n    <p id="publicIntelStatus" class="muted" role="status"></p>\n    <div id="publicIntelOutput"></div>
     <div id="localOutput"></div>
     <h3>Learning feedback (optional)</h3>
     <p class="muted small">Save a correction or verified-by-you observation. This is not independently verified and may be lost on free hosting.</p>
@@ -68,7 +68,7 @@
     try {
       const response=await fetch('/api/intelligence-team',{method:'POST',
         headers:{'Content-Type':'application/json','X-GrowthLens-Key':key},
-        body:JSON.stringify({url,cik:cik||null,radius_miles:selectedRadius(),business_address:$('localAddress').value.trim()||null})});
+        body:JSON.stringify({url,cik:cik||null,radius_miles:selectedRadius(),business_address:$('localAddress').value.trim()||null,industry:$('publicIndustry').value||null})});
       const data=await response.json();
       if (!response.ok) throw Error(data.detail||'Public intelligence request failed');
       const names={website:'Website intelligence',discovery:'Competitor discovery',pagespeed_mobile:'Mobile performance',pagespeed_desktop:'Desktop performance',corporate_filings:'SEC public-company filings',verification:'Evidence verification',opportunities:'Growth opportunities'};
