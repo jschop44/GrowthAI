@@ -18,7 +18,7 @@ def observed_features(html, industry):
     visible = soup.get_text(" ", strip=True).lower()
     links = " ".join((a.get("href") or "") + " " + a.get_text(" ", strip=True) for a in soup.find_all("a", href=True)).lower()
     haystack = (visible + " " + links)[:80000]
-    return {name: {"observed": any(re.search(r"(?<!\\w)" + re.escape(term) + r"(?!\\w)", haystack) for term in terms),
+    return {name: {"observed": any(re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", haystack) for term in terms),
                    "scope": "analyzed homepage only"}
             for name, terms in SIGNALS.get(industry or "", {}).items()}
 
