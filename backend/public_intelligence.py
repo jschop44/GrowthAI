@@ -6,6 +6,7 @@ import re
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from backend import evidence_registry
 
 class PublicIntelRequest(BaseModel):
     url: str = Field(min_length=4, max_length=2048)
@@ -60,12 +61,37 @@ def run_public_intelligence(url, cik=None):
     jobs = {"pagespeed_mobile": (pagespeed_worker, (url, "mobile")),
             "pagespeed_desktop": (pagespeed_worker, (url, "desktop")),
             "corporate_filings": (sec_worker, (cik,))}
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = {name: executor.submit(fn, *args) for name, (fn, args) in jobs.items()}
-        results = {name: future.result() for name, future in futures.items()}
+    results = {}
+    pending = {}
+    cache_hits = []
+    # Each engine has a separate cache identity; SEC results are tied to the
+    # explicitly provided CIK to avoid mixing different corporations.
+    subjects = {name: url + ("|cik:" + str(cik) if name == "corporate_filings" else "")
+                for name in jobs}
+    for name in jobs:
+        cached = evidence_registry.get(subjects[name], name)
+        if cached is not None:
+            results[name] = cached
+            cache_hits.append(name)
+        else:
+            pending[name] = jobs[name]
+    if pending:
+        with ThreadPoolExecutor(max_workers=min(3, len(pending))) as executor:
+            futures = {name: executor.submit(fn, *args) for name, (fn, args) in pending.items()}
+            for name, future in futures.items():
+                try:
+                    results[name] = future.result()
+                except Exception:
+                    results[name] = {"status": "unavailable", "source": name,
+                                     "reason": "Provider worker encountered an error"}
+                evidence_registry.put(subjects[name], name, results[name])
+    # Stable order for clients regardless of worker completion order.
+    results = {name: results[name] for name in jobs}
     return {"status": "completed_with_independent_provider_results",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "engines": results,
+            "cache_hits": cache_hits,
+            "evidence_reconciliation": evidence_registry.reconcile(results),
             "verified_sources": [name for name, result in results.items() if result["status"] == "available"],
             "limitations": ["No blocked website was crawled or bypassed.",
                             "Provider failures do not imply a website has poor performance.",
