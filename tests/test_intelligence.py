@@ -83,3 +83,13 @@ def test_neural_rank_and_history_http_contract(monkeypatch):
     history=client.get('/api/intelligence/history-changes',params={'website':'example.com'})
     assert history.status_code==200
     assert history.json()['changes']==[]
+
+def test_postgres_recovery_when_neural_collection_empty(monkeypatch):
+    from backend import learning_engine
+    monkeypatch.setattr(learning_engine,'neural_recall',lambda subject,limit: [])
+    monkeypatch.setattr(learning_engine,'config',lambda: None)
+    monkeypatch.setattr(learning_engine,'backup_read',lambda subject,limit: [
+        {'id':'restored','subject':subject,'kind':'recommendation_outcome','verified':False}])
+    result=learning_engine.recall('https://example.com')
+    assert result['storage']=='postgres'
+    assert result['observations'][0]['id']=='restored'
