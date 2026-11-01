@@ -165,3 +165,4 @@ def register_memory_routes(app):
                 'status': 'fully_connected' if full_verified else 'partial',
                 'note': 'Diagnostic uses a synthetic record and does not expose credentials.'}
     app.include_router(router)
+    return memory_health
