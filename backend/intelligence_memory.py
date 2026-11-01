@@ -78,12 +78,12 @@ def register_memory_routes(app):
         outcome = learning_engine.store(subject, 'connection_test',
             {'source': 'GrowthLens internal connection diagnostic', 'purpose': 'verify storage and retrieval'}, verified=False)
         retrieved = learning_engine.recall(subject, limit=25)
-        persisted = outcome.get('persistent', False) and retrieved.get('storage') == 'qdrant' and any(
+        persisted = outcome.get('persistent', False) and retrieved.get('storage') in ('qdrant', 'qdrant_neural') and any(
             item.get('kind') == 'connection_test' for item in retrieved.get('observations', []))
         return {'qdrant_configured': qdrant_configured, 'qdrant_write_and_read_verified': persisted,
-                'hugging_face_configured': hf_configured, 'neural_inference_verified': mode == 'neural',
-                'embedding_mode': mode, 'free_embedding_fallback': mode == 'deterministic', 'memory_storage': retrieved.get('storage'),
+                'hugging_face_configured': hf_configured, 'neural_inference_verified': outcome.get('embedding') == 'neural',
+                'embedding_mode': outcome.get('embedding'), 'free_embedding_fallback': outcome.get('embedding') == 'deterministic', 'memory_storage': retrieved.get('storage'),
                 'provider_diagnostics': learning_engine.diagnose_providers(),
-                'status': 'persistent_free_memory_active' if persisted and mode == 'deterministic' else 'fully_connected' if persisted and mode == 'neural' else 'partial',
+                'status': 'fully_connected' if persisted and outcome.get('embedding') == 'neural' else 'persistent_free_memory_active' if persisted else 'partial',
                 'note': 'Diagnostic uses a synthetic record and does not expose credentials.'}
     app.include_router(router)
