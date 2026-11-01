@@ -18,8 +18,15 @@
     </fieldset>
     <label for="localAddress" style="display:block;margin:10px 0 4px">Business street address (optional; use if website location is missing or incorrect)</label>
     <input id="localAddress" type="text" maxlength="220" placeholder="Street, city, state, ZIP" style="width:100%;max-width:520px;padding:9px;box-sizing:border-box">
-    <button id="localRun" type="button">Analyze Local Competition (15 miles)</button>
-    <p id="localStatus" class="muted" role="status"></p>\n    <label for="publicIndustry" style="display:block;margin-top:8px">Business industry (optional; enables discovery when website blocks audits)</label>\n    <select id="publicIndustry"><option value="">Detect from website</option><option value="pizza">Pizza restaurant</option><option value="restaurant">Restaurant</option><option value="roofing">Roofing</option><option value="dentist">Dentist</option><option value="plumber">Plumber</option><option value="electrician">Electrician</option><option value="hair">Hair salon</option><option value="auto">Auto repair</option><option value="hotel">Hotel</option><option value="pharmacy">Pharmacy</option><option value="landscaping">Landscaping</option><option value="hvac">HVAC</option><option value="bakery">Bakery</option><option value="coffee">Coffee shop</option></select>\n    <button id="publicIntelRun" type="button">Run coordinated intelligence team</button>\n    <label for="publicCik" style="display:block;margin-top:8px">SEC CIK (optional, for public corporations)</label>\n    <input id="publicCik" type="text" maxlength="10" inputmode="numeric" placeholder="Company CIK, if known">\n    <p id="publicIntelStatus" class="muted" role="status"></p>\n    <div id="publicIntelOutput"></div>
+
+    <p id="localStatus" class="muted" role="status"></p>
+    <label for="publicIndustry" style="display:block;margin-top:8px">Business industry (optional; enables discovery when website blocks audits)</label>
+    <select id="publicIndustry"><option value="">Detect from website</option><option value="pizza">Pizza restaurant</option><option value="restaurant">Restaurant</option><option value="roofing">Roofing</option><option value="dentist">Dentist</option><option value="plumber">Plumber</option><option value="electrician">Electrician</option><option value="hair">Hair salon</option><option value="auto">Auto repair</option><option value="hotel">Hotel</option><option value="pharmacy">Pharmacy</option><option value="landscaping">Landscaping</option><option value="hvac">HVAC</option><option value="bakery">Bakery</option><option value="coffee">Coffee shop</option></select>
+    <button id="publicIntelRun" type="button">Analyze website & competition (15 miles)</button>
+    <label for="publicCik" style="display:block;margin-top:8px">SEC CIK (optional, for public corporations)</label>
+    <input id="publicCik" type="text" maxlength="10" inputmode="numeric" placeholder="Company CIK, if known">
+    <p id="publicIntelStatus" class="muted" role="status"></p>
+    <div id="publicIntelOutput"></div>
     <div id="localOutput"></div>
     <h3>Learning feedback (optional)</h3>
     <p class="muted small">Save a correction or verified-by-you observation. This is not independently verified and may be lost on free hosting.</p>
@@ -50,7 +57,7 @@
   const $ = id => document.getElementById(id);
   const selectedRadius = () => Number(document.querySelector('input[name="localRadius"]:checked')?.value || 15);
   panel.querySelectorAll('input[name="localRadius"]').forEach(input => input.addEventListener('change', () => {
-    $('localRun').textContent = `Analyze Local Competition (${selectedRadius()} miles)`;
+    $('publicIntelRun').textContent = `Analyze website & competition (${selectedRadius()} miles)`;
   }));
   $('learningSave').onclick = async () => {
     const key=$('privateKey')?.value.trim(), website=$('url')?.value.trim(), value=$('learningValue').value.trim();
@@ -86,53 +93,17 @@
         }
         $('publicIntelOutput').append(paragraph);
       }
+      const discovery=data.engines?.discovery||{};
+      const rivals=Array.isArray(discovery.competitors)?discovery.competitors:[];
+      const opportunities=data.engines?.opportunities||{};
+      const output=$('localOutput'); output.replaceChildren();
+      const title=document.createElement('h3'); title.textContent='Nearby competition ('+rivals.length+' public listings)'; output.append(title);
+      const note=document.createElement('p'); note.className='muted'; note.textContent=discovery.warning||discovery.reason||discovery.source||'Public listings may be incomplete.'; output.append(note);
+      if(rivals.length){ const table=document.createElement('table'); const head=document.createElement('thead'); head.innerHTML='<tr><th>Business</th><th>Distance</th><th>Source</th></tr>';table.append(head); const body=document.createElement('tbody'); for(const rival of rivals){const tr=document.createElement('tr'); for(const value of [rival.name||'Unnamed',rival.distance_miles!=null?rival.distance_miles+' mi':'Unknown',(rival.source_providers||[rival.provider||'Public listing']).join(', ')]){const td=document.createElement('td');td.textContent=value;tr.append(td);}body.append(tr);}table.append(body);output.append(table);}
+      const heading=document.createElement('h3');heading.textContent='Evidence-supported opportunities';output.append(heading);
+      const list=document.createElement('ul');for(const item of opportunities.recommendations||[]){const li=document.createElement('li');li.textContent=(item.issue||'Opportunity')+': '+(item.recommendation||'')+' ('+(item.evidence||'limited evidence')+')';list.append(li);}if(!list.children.length){const li=document.createElement('li');li.textContent='No verified opportunities established from available evidence.';list.append(li);}output.append(list);
       $('publicIntelStatus').textContent='Coordinated engines complete. Missing results are not scored as zero.';
     } catch(e) { $('publicIntelStatus').textContent=String(e.message); }
     finally { $('publicIntelRun').disabled=false; }
-  };
-  $('localRun').onclick = async () => {
-    const key = $('privateKey')?.value.trim();
-    const url = $('url')?.value.trim() || (typeof activeAuditUrl !== 'undefined' ? activeAuditUrl : '');
-    if (!key || !url) { $('localStatus').textContent='Enter your access key and website URL first.'; return; }
-    const radius_miles = selectedRadius();
-    $('localRun').disabled=true;
-    $('localStatus').textContent=`Checking business metadata, location, and competitor websites within ${radius_miles} miles. This may take a minute...`;
-    try {
-      const res = await fetch('/api/local-competition', {
-        method:'POST', headers:{'Content-Type':'application/json','X-GrowthLens-Key':key},
-        body:JSON.stringify({url, radius_miles, business_address: $('localAddress').value.trim() || null})
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(typeof data.detail==='string'?data.detail:'Request failed ('+res.status+')');
-      const company=data.identity;
-      const logo=company.logo_url ? `<img src="${esc(company.logo_url)}" alt="Company logo reported by website" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : '<span class="muted">No logo detected</span>';
-      const rivals=data.competitors.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.distance_miles)} mi</td><td>${c.score===null?'N/A':esc(c.score)+'/100'}</td><td>${c.website ? `<a href="${esc(c.website)}" target="_blank" rel="noopener noreferrer">Website</a>` : "Not listed"}</td><td>${esc(c.status)}</td></tr>`).join('');
-      const actions=data.opportunities.slice(0,8).map(o=>`<li><strong>${esc(o.issue)}:</strong> ${esc(o.recommendation)} ${o.competitors_passing_check.length?'<span class="localNote">Competitors passing: '+esc(o.competitors_passing_check.join(', '))+'</span>':''}</li>`).join('');
-      $('localOutput').innerHTML=`
-        <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:15px 0">${logo}<div><h3 style="margin:0">${esc(company.name)}</h3><p class="muted" style="margin:5px 0">${esc(company.address||'Physical address not detected')} · ${esc(company.name_source)}</p></div></div>
-        <p><strong>Detected business type:</strong> ${esc(data.classification?.label || 'Unknown')} · <strong>Confidence:</strong> ${esc(data.classification?.confidence || 'unknown')}</p>
-        <p class="localNote"><strong>Classification evidence:</strong> ${(data.classification?.evidence || []).map(e => esc(e.source) + ' (' + esc((e.matched_terms || []).join(', ')) + ')').join('; ') || 'Insufficient evidence'}</p>
-        <p><strong>Location source:</strong> ${esc(data.location_source || "Not established")} ${company.address ? `· ${esc(company.address)}` : ""}</p>
-        <p><strong>Target technical score:</strong> ${esc(data.audit.score)}/100 · <strong>Radius:</strong> ${esc(data.radius_miles)} miles</p>
-        ${data.warning?'<p class="bad">'+esc(data.warning)+'</p>':''}
-        <h3>Nearby competitors (${data.competitors.length} found in public listings)</h3>
-        <table><thead><tr><th>Business</th><th>Distance</th><th>Technical score</th><th>Source website</th><th>Audit status</th></tr></thead><tbody>${rivals||'<tr><td colspan="5">No matching competitors were found in available public listings.</td></tr>'}</tbody></table>
-        <p class="localNote">${esc(data.discovery_source)}. All scores use the same single-page technical checklist. N/A is not zero.</p>
-        <h3>Industry-specific opportunities</h3><ol>${(data.industry_recommendations||[]).map(x=>`<li><strong>${esc(x.issue)}:</strong> ${esc(x.recommendation)} <span class="localNote">${esc(x.evidence)}</span></li>`).join('') || '<li>No additional homepage-specific signals identified.</li>'}</ol>
-        <h3>Business-specific action plan</h3><ol>${actions||'<li>No failed technical checks were identified on the target page.</li>'}</ol>
-        <h3>Observed competitor capabilities</h3>
-        <p class="localNote">Homepage evidence only; absence is not established.</p>
-        <ul>${(data.feature_comparison||[]).map(x=>"<li>"+esc(x.feature)+": target "+(x.target_observed?"observed":"not observed")+"; competitors observed: "+esc(x.competitors_with_feature.join(", ")||"none")+"</li>").join("")}</ul>
-        <h3>Automatic financial scenarios</h3>
-        <p class="localNote">Hypothetical opportunity ranges only, NOT verified lost revenue. Very low confidence; do not add scenarios together.</p>
-        <ul>${(data.financial_scenarios?.opportunities||[]).map(x=>"<li>"+esc(x.feature)+": annual illustrative revenue range $"+Number(x.annual_revenue_scenarios.conservative).toLocaleString()+" to $"+Number(x.annual_revenue_scenarios.optimistic).toLocaleString()+"; baseline $"+Number(x.annual_revenue_scenarios.baseline).toLocaleString()+"; based on hypothetical conversion lift and transaction values, not measured sales.</li>").join("")||"<li>No modeled opportunities with observed competitor evidence.</li>"}</ul>
-        <h3>Traffic and revenue evidence</h3>
-        <p><strong>Verified visits:</strong> Unavailable. ${esc(data.traffic.status)}</p>
-        <p><strong>Verified revenue opportunity:</strong> Unavailable. ${esc(data.revenue.status)}</p>
-        <p class="localNote">${esc(data.limitations.join(' '))}</p>`;
-      panel.dispatchEvent(new CustomEvent('growthlens:report', {detail:data}));
-      $('localStatus').textContent=`Local ${data.radius_miles}-mile analysis complete. You can print this section with the main report.`;
-    } catch(e) { $('localStatus').textContent=e.message; }
-    finally { $('localRun').disabled=false; }
   };
 })()
