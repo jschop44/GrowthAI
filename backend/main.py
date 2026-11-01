@@ -177,8 +177,51 @@ def analyze_html(html, url, elapsed_ms):
         ('internal_links','Internal navigation links',internal_links>=3,9,'Link to relevant internal pages for discoverability.'),
     ]
     findings = [{'id':key,'name':name,'passed':passed,'weight':weight,'recommendation':recommendation} for key,name,passed,weight,recommendation in checks]
+    # Expanded unscored diagnostics preserve the original 100-point scoring baseline.
+    lang=(soup.html.get('lang','').strip() if soup.html else '')
+    og_title=soup.find('meta',attrs={'property':'og:title'})
+    og_image=soup.find('meta',attrs={'property':'og:image'})
+    heading_counts={f'h{n}':len(soup.find_all(f'h{n}')) for n in range(1,7)}
+    generic_links=sum(1 for a in soup.find_all('a',href=True)
+                      if a.get_text(' ',strip=True).lower() in ('click here','read more','learn more'))
+    unlabeled_inputs=sum(1 for x in soup.find_all('input')
+        if x.get('type','text') not in ('hidden','submit','button')
+        and not (x.get('aria-label') or x.get('aria-labelledby')
+                 or (x.get('id') and soup.find('label',attrs={'for':x.get('id')}))))
+    extra_checks=[
+      ('language','Document language',bool(lang),'Set the HTML lang attribute to the page language.'),
+      ('social_title','Social sharing title',bool(og_title and og_title.get('content')),'Add an og:title meta tag.'),
+      ('social_image','Social sharing image',bool(og_image and og_image.get('content')),'Add an og:image meta tag.'),
+      ('headings','Content heading structure',bool(h1s and heading_counts['h2']),'Use descriptive H2 headings to organize the page.'),
+      ('link_labels','Descriptive link labels',generic_links==0,'Replace generic link text with meaningful destination labels.'),
+      ('form_accessibility','Accessible form fields',unlabeled_inputs==0,'Associate each form field with a label.')
+    ]
+    findings.extend({'id':key,'name':name,'passed':passed,'weight':0,
+                     'category':'Expanded diagnostics (unscored)','recommendation':rec}
+                    for key,name,passed,rec in extra_checks)
+    implementation={
+      'title':['Open the page SEO settings or HTML head.','Write a unique title describing the business, main service and location where relevant.','Keep it roughly 20–65 characters and publish.','Check the browser tab title and re-run the audit.'],
+      'description':['Open the page SEO metadata editor.','Write a 70–170 character summary of the page and customer value.','Publish the description meta tag.','Verify it in page source and re-run the audit.'],
+      'h1':['Open the page editor.','Choose one primary heading describing the page.','Set its HTML tag to H1 and use H2 for sections.','Publish and verify the heading structure.'],
+      'viewport':['Open the site template HTML head.','Add a viewport meta tag with width=device-width and initial-scale=1.','Test the layout at mobile and tablet widths.','Publish and verify the meta tag.'],
+      'https':['Enable TLS/SSL with your hosting provider.','Redirect HTTP traffic to HTTPS.','Update internal links and canonical URLs to HTTPS.','Verify the secure connection and absence of mixed content.'],
+      'canonical':['Select the preferred URL for this page.','Add a canonical link element in the HTML head pointing to that exact URL.','Avoid using the same canonical for unrelated pages.','Publish and inspect the canonical tag.'],
+      'image_alt':['Identify informative images on the page.','Add concise alt text describing their relevant content.','Use empty alt text for purely decorative images.','Publish and check the image accessibility labels.'],
+      'structured_data':['Choose an appropriate schema.org type such as LocalBusiness or Organization.','Prepare accurate JSON-LD using verified business facts.','Add it through the CMS or HTML head.','Validate with the Schema.org Validator.'],
+      'internal_links':['Identify useful service, contact and about pages.','Add descriptive contextual links to those pages.','Check each link works on desktop and mobile.','Re-run the audit to verify internal navigation.'],
+      'language':['Set the root HTML element language, for example lang="en".','Publish and verify the HTML source.'],
+      'social_title':['Set the og:title meta property to a descriptive sharing title.','Publish and inspect the social metadata.'],
+      'social_image':['Choose a representative public image.','Set og:image to its absolute HTTPS URL.','Check that the image loads and previews correctly.'],
+      'headings':['Group page content into clear sections.','Use H2 headings under the main H1.','Review the heading order with an accessibility checker.'],
+      'link_labels':['Find links named click here, read more or learn more.','Replace them with descriptive labels identifying the destination.','Verify keyboard navigation.'],
+      'form_accessibility':['Find inputs without visible labels.','Associate each input with a matching label for/id or accessible name.','Test keyboard and screen-reader usability.']
+    }
+    for finding in findings:
+        finding['implementation_steps']=implementation.get(finding['id'],[])
+        finding['priority']='high' if not finding['passed'] and finding['weight']>=12 else 'medium' if not finding['passed'] else 'passed'
+        finding['verification']='Publish changes and re-run the website audit.'
     score = sum(f['weight'] for f in findings if f['passed'])
-    return {'url':url,'score':score,'max_score':100,'scoring_scope':'Single-page on-page technical checks; not an overall business growth score','findings':findings,'observations':{'title':title,'meta_description':description,'h1_count':len(h1s),'image_count':len(imgs),'images_missing_alt':missing_alt,'internal_link_count':internal_links,'structured_data_blocks':structured,'fetch_elapsed_ms':round(elapsed_ms)},'limitations':['Only the supplied page is analyzed, not the whole site.','No search rankings, traffic, competitor revenue, social accounts, logo quality, or AI search visibility are measured.','Fetch time is not a Lighthouse or Core Web Vitals score.']}
+    return {'url':url,'score':score,'max_score':100,'scoring_scope':'Single-page on-page technical checks; not an overall business growth score','findings':findings,'observations':{'title':title,'meta_description':description,'h1_count':len(h1s),'image_count':len(imgs),'images_missing_alt':missing_alt,'internal_link_count':internal_links,'structured_data_blocks':structured,'fetch_elapsed_ms':round(elapsed_ms),'heading_counts':heading_counts,'document_language':lang,'generic_link_count':generic_links,'unlabeled_inputs':unlabeled_inputs,'social_title_present':bool(og_title),'social_image_present':bool(og_image)},'limitations':['Only the supplied page is analyzed, not the whole site.','No search rankings, traffic, competitor revenue, social accounts, logo quality, or AI search visibility are measured.','Fetch time is not a Lighthouse or Core Web Vitals score.']}
 
 def robots_allowed(client,url):
     parsed=urlparse(url)
