@@ -28,6 +28,9 @@
     <p id="publicIntelStatus" class="muted" role="status"></p>
     <div id="publicIntelOutput"></div>
     <div id="localOutput"></div>
+    <h3>Neural memory connection</h3>
+    <button id="memoryHealthRun" type="button">Test Qdrant &amp; Hugging Face</button>
+    <p id="memoryHealthStatus" class="muted" role="status"></p>
     <h3>Learning feedback (optional)</h3>
     <p class="muted small">Save a correction or verified-by-you observation. This is not independently verified and may be lost on free hosting.</p>
     <label for="learningField">Field</label><select id="learningField" style="padding:10px;background:#0c1d27;color:white"><option value="industry">Industry</option><option value="name">Business name</option><option value="address">Address</option><option value="service">Service</option><option value="correction">Other correction</option></select>
@@ -59,6 +62,22 @@
   panel.querySelectorAll('input[name="localRadius"]').forEach(input => input.addEventListener('change', () => {
     $('publicIntelRun').textContent = `Analyze website & competition (${selectedRadius()} miles)`;
   }));
+  $('memoryHealthRun').onclick = async () => {
+    const key=$('privateKey')?.value.trim();
+    if(!key){$('memoryHealthStatus').textContent='Enter the private access key first.';return;}
+    $('memoryHealthRun').disabled=true;
+    $('memoryHealthStatus').textContent='Testing persistent storage and neural inference...';
+    try {
+      const r=await fetch('/api/intelligence/memory-health',{headers:{'X-GrowthLens-Key':key}});
+      const d=await r.json();
+      if(!r.ok)throw Error(d.detail||'Connection test failed');
+      $('memoryHealthStatus').textContent=
+        'Qdrant: '+(d.qdrant_write_and_read_verified?'verified persistent read/write':d.qdrant_configured?'configured but connection test failed':'not configured')+
+        '. Hugging Face: '+(d.neural_inference_verified?'verified neural embeddings':d.hugging_face_configured?'configured but neural inference failed':'not configured')+
+        '. Overall: '+d.status+'.';
+    }catch(e){$('memoryHealthStatus').textContent=String(e.message);}
+    finally{$('memoryHealthRun').disabled=false;}
+  };
   $('learningSave').onclick = async () => {
     const key=$('privateKey')?.value.trim(), website=$('url')?.value.trim(), value=$('learningValue').value.trim();
     if (!key || !website || !value) { $('learningStatus').textContent='Enter the access key, website, and feedback.'; return; }
