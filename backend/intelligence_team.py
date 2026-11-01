@@ -6,7 +6,7 @@ import time
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from backend import evidence_registry
+from backend import evidence_registry, learning_engine
 from backend.public_intelligence import run_public_intelligence
 from backend.local_competition import (
     LocalRequest, extract_identity, extract_address_from_page, classify_business,
@@ -112,8 +112,34 @@ def run_team(url, address, radius, cik, validate_url, fetch_public, robots_allow
     results = {"website": website, "discovery": discovery, **public["engines"]}
     verification = verification_worker(results)
     opportunities = opportunity_worker(results)
+    # Record only source-attributed observations; availability is not independent verification.
+    prior = learning_engine.recall(url)
+    memory_records = []
+    for engine_name in ("website", "discovery", "pagespeed_mobile", "pagespeed_desktop", "crux_mobile", "crux_desktop", "corporate_filings"):
+        result = results.get(engine_name) or {}
+        if result.get("status") == "available":
+            summary = {"source": result.get("source") or engine_name, "status": "available",
+                       "observed_at": datetime.now(timezone.utc).isoformat()}
+            if engine_name == "discovery":
+                summary["competitor_count"] = len(result.get("competitors") or [])
+                summary["radius_miles"] = radius
+                summary["warning"] = result.get("warning")
+            elif engine_name == "website":
+                summary["classification"] = result.get("classification")
+                summary["score"] = (result.get("audit") or {}).get("score")
+            else:
+                summary["performance_score"] = result.get("performance_score")
+                summary["company_name"] = result.get("company_name")
+                summary["metrics_p75"] = result.get("metrics_p75")
+            memory_records.append(learning_engine.store(url, engine_name, summary))
     return {"status": "complete_with_partial_results", "generated_at": datetime.now(timezone.utc).isoformat(),
             "engines": {**results, "verification": verification, "opportunities": opportunities},
+            "memory": {"prior_observations": len(prior.get("observations", [])),
+                       "storage": prior.get("storage"),
+                       "new_observations": sum(bool(r.get("stored")) for r in memory_records),
+                       "persistent": any(r.get("persistent") for r in memory_records),
+                       "neural_embeddings": any(r.get("embedding") == "neural" for r in memory_records),
+                       "note": "History is source-attributed, not automatically retrained or independently verified."},
             "shared_evidence": {"public_provider_cache_hits": public.get("cache_hits", []),
                                 "conflicts": verification["reconciliation"]["conflicts"]},
             "execution": "Independent public providers and permitted website analysis start concurrently; discovery waits for website classification; verification and opportunities consume shared results.",
