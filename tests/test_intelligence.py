@@ -113,3 +113,27 @@ def test_business_lookup_requires_private_key():
     from backend.main import app
     response=TestClient(app).post('/api/business-lookup',json={'query':'Sample Pizza'})
     assert response.status_code==401
+
+
+def test_business_lookup_falls_back_to_public_search(monkeypatch):
+    from backend.main import _business_candidates
+    import httpx
+    def respond(request):
+        if 'nominatim' in str(request.url):
+            return httpx.Response(200,json=[{'display_name':'Sample Pizza, Town',
+                'extratags':{}}])
+        return httpx.Response(200,text='<html><a href="https://samplepizza.example/">Sample Pizza Official Website</a></html>')
+    client=httpx.Client(transport=httpx.MockTransport(respond))
+    monkeypatch.setattr('backend.main.validate_url',lambda url:url)
+    matches=_business_candidates('Sample Pizza Town',client)
+    assert matches and matches[0]['website']=='https://samplepizza.example/'
+    assert matches[0]['source'].startswith('Public web search')
+
+
+def test_financial_estimates_are_identified_as_scenarios():
+    from backend.main import analyze_html
+    report=analyze_html('<html><body><h1>Example</h1></body></html>','https://example.com',5)
+    finding=next(f for f in report['findings'] if f['id']=='conversion_cta')
+    assert finding['financial_scenario']['confidence']=='illustrative_only'
+    assert finding['financial_scenario']['implementation_cost_usd']['low']>0
+    assert finding['financial_scenario']['annual_incremental_revenue_usd']>=0
