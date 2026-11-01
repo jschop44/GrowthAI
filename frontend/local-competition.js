@@ -31,7 +31,7 @@
   results.parentNode.insertBefore(panel, results.nextSibling);
   const style = document.createElement('style');
   style.textContent = `
-    #localCompetition table{width:100%;border-collapse:collapse;font-size:13px}
+    #localOutput{max-width:100%;overflow-x:auto;overflow-wrap:anywhere}\n    #localCompetition table{width:100%;border-collapse:collapse;font-size:13px}
     #localCompetition th,#localCompetition td{padding:9px;text-align:left;border-bottom:1px solid #34515b;vertical-align:top}
     #localCompetition img{max-height:60px;max-width:160px;object-fit:contain;background:white;padding:5px;border-radius:6px}
     #localCompetition .localNote{font-size:12px;opacity:.85}
