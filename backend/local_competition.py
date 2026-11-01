@@ -174,10 +174,12 @@ def osm_competitors(client, lat, lon, classification, host, radius_miles):
             filters.append(f'{element_type}(around:{radius_meters},{lat},{lon}){filt};')
     query = '[out:json][timeout:25];(' + ''.join(filters) + ');out center 300;'
     endpoints = (
-        'https://overpass.kumi.systems/api/interpreter',
+        'https://overpass.private.coffee/api/interpreter',
+        'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
         'https://overpass-api.de/api/interpreter',
     )
     elements = None
+    # Public endpoints are best-effort; try independent instances sequentially.
     for endpoint in endpoints:
         try:
             response = client.post(endpoint, data={'data': query}, headers=OSM_HEADERS, timeout=35)
