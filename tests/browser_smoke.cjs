@@ -44,14 +44,7 @@ const { chromium } = require('playwright');
       await page.locator('#glPremium input[aria-label="Search businesses"]').fill('Nearby');
       if (!(await page.locator('#glPremium').innerText()).includes('1 of 1 listings'))
         throw Error('Business explorer search reset failed');
-      await page.locator('#glVisits').fill('1000');
-      await page.locator('#glConversion').fill('2');
-      await page.locator('#glValue').fill('100');
-      await page.locator('#glUplift').fill('10');
-      await page.locator('#glCost').fill('0');
-      await page.locator('#glDelay').fill('0');
-      if (!(await page.locator('#glPremium .gl-result').innerText()).includes('$2,400'))
-        throw Error('Financial calculator returned incorrect first-year result');
+      if (await page.locator('#glVisits').count()) throw Error('Manual financial calculator should be removed');
       if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 3))
         throw Error('Report overflows mobile viewport '+viewport.width);
       if (errors.length) throw Error('Browser errors: '+errors.join('; '));
