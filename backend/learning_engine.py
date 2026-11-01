@@ -14,7 +14,7 @@ DIM=384
 
 def vectorize(text):
     token=os.getenv("HF_TOKEN","").strip()
-    if token:
+    if token and os.getenv("ENABLE_PAID_HF_INFERENCE") == "1":
         try:
             with httpx.Client(timeout=12,trust_env=False) as client:
                 r=client.post("https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction",headers={"Authorization":"Bearer "+token},json={"inputs":text[:2500]})
@@ -47,14 +47,14 @@ def diagnose_providers():
             output["qdrant"]={"reachable":False,"error_type":type(e).__name__}
     else: output["qdrant"]={"configured":False}
     token=os.getenv("HF_TOKEN","").strip()
-    if token:
+    if token and os.getenv("ENABLE_PAID_HF_INFERENCE") == "1":
         try:
             with httpx.Client(timeout=12,trust_env=False) as client:
                 r=client.post("https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction",headers={"Authorization":"Bearer "+token},json={"inputs":"GrowthLens test"})
             output["hugging_face"]={"http_status":r.status_code,"reachable":r.is_success,"response_shape":type(r.json()).__name__ if r.is_success else None}
         except (httpx.HTTPError,ValueError) as e:
             output["hugging_face"]={"reachable":False,"error_type":type(e).__name__}
-    else: output["hugging_face"]={"configured":False}
+    else: output["hugging_face"]={"configured":bool(token),"status":"disabled_to_avoid_paid_inference","free_fallback":"local deterministic embeddings"}
     return output
 
 def config():
@@ -86,6 +86,9 @@ def store(subject,kind,data,verified=False):
                 if check.status_code==404:
                     client.put(url+"/collections/"+COLLECTION,headers=headers,json={"vectors":{"size":DIM,"distance":"Cosine"}}).raise_for_status()
                 else:check.raise_for_status()
+                # Index the subject before filtered recall (required by some Qdrant Cloud clusters).
+                index = client.put(url+"/collections/"+COLLECTION+"/index",headers=headers,params={"wait":"true"},json={"field_name":"subject","field_schema":"keyword"})
+                if index.status_code not in (200, 201, 202, 409): index.raise_for_status()
                 client.put(url+"/collections/"+COLLECTION+"/points",headers=headers,params={"wait":"true"},json={"points":[{"id":record["id"],"vector":vector,"payload":record}]}).raise_for_status()
             remote=True
         except (httpx.HTTPError,ValueError):
