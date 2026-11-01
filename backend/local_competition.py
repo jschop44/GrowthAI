@@ -272,6 +272,8 @@ def register_local_routes(app, validate_url, fetch_public, robots_allowed, analy
             candidates=[];warning=None
             if lat is None: warning='No reliable physical address or coordinates found on the target website. Cannot establish the selected search radius.'
             else: candidates,warning=osm_competitors(client,lat,lon,classification,(urlparse(final).hostname or '').lower().removeprefix('www.'),body.radius_miles)
+            from backend.comparison import observed_features, compare_features
+            target_features = observed_features(response.text, classification.get('key'))
             competitors=[]
             audited_count = 0
             for c in candidates:
@@ -291,20 +293,18 @@ def register_local_routes(app, validate_url, fetch_public, robots_allowed, analy
                     else:
                         started=time.monotonic();r,real=fetch_public(client,safe)
                         comp=analyze_html(r.text,real,(time.monotonic()-started)*1000)
-                        row.update(score=comp['score'],status='audited',findings=comp['findings'],website=real)
+                        row.update(score=comp['score'],status='audited',findings=comp['findings'],website=real,features=observed_features(r.text,classification.get('key')))
                 except (httpx.HTTPError,ValueError) as exc: row['status']='unavailable: '+str(exc)[:90]
                 competitors.append(row)
         opportunities=[]
         for f in sorted((f for f in audit['findings'] if not f['passed']),key=lambda x:-x['weight']):
             rivals=[c['name'] for c in competitors if c['score'] is not None and any(x['id']==f['id'] and x['passed'] for x in c['findings'])]
             opportunities.append({'priority':len(opportunities)+1,'issue':f['name'],'recommendation':f['recommendation'],'weight':f['weight'],'competitors_passing_check':rivals,'evidence':'Failed check on target page'+('; passing competitor: '+', '.join(rivals[:3]) if rivals else '')})
+        comparison = compare_features(target_features, competitors)
         from backend.financial_intelligence import estimate_opportunities
-        feature_gaps = [
-            {'feature': item['issue'], 'competitors_with_feature': item['competitors_passing_check']}
-            for item in opportunities if item.get('competitors_passing_check')
-        ]
+        feature_gaps = [item for item in comparison if not item['target_observed'] and item['competitors_with_feature']]
         financial_scenarios = estimate_opportunities(classification.get('key'), competitors, feature_gaps)
-        return {'identity':identity,'classification':classification,'industry_recommendations':industry_recommendations(classification,response.text),'financial_scenarios':financial_scenarios,'audit':audit,'radius_miles':body.radius_miles,'location_source':location_source,'competitors':competitors,'discovery_source':'OpenStreetMap contributors via Overpass API; business-category and specialty matching, including listings without websites; coverage is incomplete','warning':warning,'opportunities':opportunities,'traffic':{'visits':None,'source':None,'status':'Not available: public HTML does not verify traffic. Connect authorized first-party analytics for verified traffic.'},'revenue':{'amount':None,'source':None,'status':'Not calculated: verified traffic, conversion rate and revenue per conversion are not available.'},'limitations':['Competitor scores are single-page technical checks, not rankings or business performance scores.','Competitor list is not exhaustive; only five competitor websites are audited per request.','Business identity and logo are extracted from website metadata and may require confirmation.','No verified traffic, leads, conversion or revenue data was provided.']}
+        return {'identity':identity,'classification':classification,'industry_recommendations':industry_recommendations(classification,response.text),'financial_scenarios':financial_scenarios,'feature_comparison':comparison,'audit':audit,'radius_miles':body.radius_miles,'location_source':location_source,'competitors':competitors,'discovery_source':'OpenStreetMap contributors via Overpass API; business-category and specialty matching, including listings without websites; coverage is incomplete','warning':warning,'opportunities':opportunities,'traffic':{'visits':None,'source':None,'status':'Not available: public HTML does not verify traffic. Connect authorized first-party analytics for verified traffic.'},'revenue':{'amount':None,'source':None,'status':'Not calculated: verified traffic, conversion rate and revenue per conversion are not available.'},'limitations':['Competitor scores are single-page technical checks, not rankings or business performance scores.','Competitor list is not exhaustive; only five competitor websites are audited per request.','Business identity and logo are extracted from website metadata and may require confirmation.','No verified traffic, leads, conversion or revenue data was provided.']}
     app.include_router(router)
     from backend.intelligence_memory import register_memory_routes
     register_memory_routes(app)
