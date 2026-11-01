@@ -612,7 +612,7 @@ $("auditForm").onsubmit = async e => {
 
   try {
     const input=$("url").value.trim();
-    const looksLikeUrl=/^(https?:\\/\\/)?(?:[a-z0-9-]+\\.)+[a-z]{2,}(?:[\\/:?#]|$)/i.test(input);
+    const looksLikeUrl=/^(https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[\/:?#]|$)/i.test(input);
     if(!looksLikeUrl){
       const lookup=await api("/api/business-lookup",{method:"POST",
         headers:{"Content-Type":"application/json"},body:JSON.stringify({query:input})});
