@@ -337,15 +337,18 @@ MEMORY_SELF_TEST = register_memory_routes(app)
 def verify_memory_on_startup():
     def check():
         import logging
-        try:
+        while True:
+          try:
             result=MEMORY_SELF_TEST()
-            logging.getLogger('growthlens.memory').info(
+            logging.getLogger('growthlens.memory').log(
+                logging.INFO if result.get('status')=='fully_connected' else logging.ERROR,
                 'memory_self_test status=%s qdrant=%s semantic=%s postgres=%s match=%s',
                 result.get('status'),result.get('qdrant_write_and_read_verified'),
                 result.get('qdrant_semantic_search_verified'),
                 result.get('postgres_backup_read_verified'),
                 result.get('cross_provider_record_match'))
-        except Exception as exc:
+          except Exception as exc:
             logging.getLogger('growthlens.memory').error(
                 'memory_self_test failed error_type=%s',type(exc).__name__)
+          time.sleep(1800)
     threading.Thread(target=check,daemon=True,name='growthlens-memory-self-test').start()
