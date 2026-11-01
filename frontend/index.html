@@ -567,7 +567,7 @@ function render(data, createdAt = null) {
     return "<article class='finding'><strong class='"+(f.passed?"ok":"bad")+"'>"+
       (f.passed?"✓ ":"Needs attention · ")+esc(f.name)+"</strong>"+
       (f.weight?" · "+esc(f.weight)+" points":" · Additional diagnostic")+
-      "<p>"+esc(f.passed?"Check passed.":f.recommendation)+"</p>"+
+      "<p>"+esc(f.passed?"Check passed.":f.recommendation)+"</p>"+(!f.passed?scenario:"")+
       (!f.passed&&steps?"<details open><summary>Step-by-step implementation</summary><ol>"+steps+
         "</ol><p class='muted small'>"+esc(f.verification||'Re-run the audit after publishing.')+"</p></details>":"")+
       "</article>";
