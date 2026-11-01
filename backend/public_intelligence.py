@@ -45,7 +45,7 @@ def sec_worker(cik):
     try:
         with httpx.Client(trust_env=False, timeout=12) as client:
             response = client.get("https://data.sec.gov/submissions/CIK" + normalized + ".json",
-                headers={"User-Agent": "GrowthLensAI public research contact support@growthlens.example", "Accept": "application/json"})
+                headers={"User-Agent": "GrowthLensAI public research github.com/jschop44/GrowthAI", "Accept": "application/json"})
             response.raise_for_status()
             data = response.json()
         return {"status": "available", "source": "SEC EDGAR", "cik": normalized,
