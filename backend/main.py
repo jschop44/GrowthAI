@@ -125,6 +125,22 @@ def _business_candidates(query, client):
                 break
     except (httpx.HTTPError,ValueError):
         pass
+    if not candidates:
+        # Bing RSS offers a second search path when HTML search is blocked.
+        try:
+            response=client.get('https://www.bing.com/search',
+                params={'q':query+' official business website','format':'rss'},
+                headers={'User-Agent':AGENT,'Accept':'application/rss+xml'},timeout=10)
+            response.raise_for_status()
+            rss=BeautifulSoup(response.text[:250000],'xml')
+            for item in rss.find_all('item')[:8]:
+                link=item.find('link')
+                title=item.find('title')
+                if link and link.get_text(strip=True).startswith('https://'):
+                    add(title.get_text(' ',strip=True) if title else query,'',
+                        link.get_text(strip=True),'Public web search (verify business identity)')
+        except (httpx.HTTPError,ValueError):
+            pass
     return candidates[:12]
 
 @app.post('/api/business-lookup')
