@@ -77,6 +77,12 @@ def register_memory_routes(app):
     def evaluate_evidence(website: str):
         domain=domain_for(website)
         return learning_engine.evaluation_summary('https://'+domain)
+    @router.get('/api/intelligence/semantic-search')
+    def search_evidence(website: str, query: str):
+        domain=domain_for(website)
+        if not 2 <= len(query.strip()) <= 500:
+            raise HTTPException(422,'Query must be 2 to 500 characters.')
+        return learning_engine.semantic_search(query,subject='https://'+domain)
     @router.get('/api/intelligence/memory-health')
     def memory_health():
         # This endpoint is protected by the same private API middleware as other /api/intelligence routes.
@@ -87,10 +93,14 @@ def register_memory_routes(app):
         outcome = learning_engine.store(subject, 'connection_test',
             {'source': 'GrowthLens internal connection diagnostic', 'purpose': 'verify storage and retrieval'}, verified=False)
         retrieved = learning_engine.recall(subject, limit=25)
+        backup_read_verified = learning_engine.backup_verify(
+            next((item.get('id') for item in retrieved.get('observations', []) if item.get('kind') == 'connection_test'), ''), subject) if outcome.get('postgres_backup') else False
         persisted = outcome.get('persistent', False) and retrieved.get('storage') in ('qdrant', 'qdrant_neural') and any(
             item.get('kind') == 'connection_test' for item in retrieved.get('observations', []))
         return {'postgres_backup_configured':bool(os.getenv('NEON_DATABASE_URL') or os.getenv('DATABASE_URL')),
-                'postgres_backup_verified':outcome.get('postgres_backup',False),
+                'postgres_backup_verified':backup_read_verified,
+                'postgres_backup_write_verified':outcome.get('postgres_backup',False),
+                'postgres_backup_read_verified':backup_read_verified,
                 'qdrant_configured': qdrant_configured, 'qdrant_write_and_read_verified': persisted,
                 'hugging_face_configured': hf_configured, 'neural_inference_verified': outcome.get('embedding') == 'neural',
                 'embedding_mode': outcome.get('embedding'), 'free_embedding_fallback': outcome.get('embedding') == 'deterministic', 'memory_storage': retrieved.get('storage'),
