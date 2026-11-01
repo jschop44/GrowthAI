@@ -560,6 +560,7 @@ function render(data, createdAt = null) {
   const failedFindings=(data.findings||[]).filter(f=>!f.passed);
   const passedFindings=(data.findings||[]).filter(f=>f.passed);
   const renderFinding=f=>{
+    const finance=f.financial_scenario;
     const steps=(f.implementation_steps||[]).map(step=>'<li>'+esc(step)+'</li>').join('');
     return "<article class='finding'><strong class='"+(f.passed?"ok":"bad")+"'>"+
       (f.passed?"✓ ":"Needs attention · ")+esc(f.name)+"</strong>"+
