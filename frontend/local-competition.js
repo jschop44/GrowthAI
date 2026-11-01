@@ -32,7 +32,7 @@
     <button id="memoryHealthRun" type="button">Test Neural Memory &amp; Backup</button>
     <p id="memoryHealthStatus" class="muted" role="status"></p>
     <h3>Learning feedback (optional)</h3>
-    <p class="muted small">Save a correction or verified-by-you observation. This is not independently verified and may be lost on free hosting.</p>
+    <p class="muted small">Save a correction or observation. User feedback is not independently verified; durable storage is checked separately.</p>
     <label for="learningField">Field</label><select id="learningField" style="padding:10px;background:#0c1d27;color:white"><option value="industry">Industry</option><option value="name">Business name</option><option value="address">Address</option><option value="service">Service</option><option value="correction">Other correction</option></select>
     <label for="learningValue">Correction or observation</label><input id="learningValue" maxlength="300" placeholder="e.g. Pizza restaurant">
     <button type="button" id="learningSave">Record feedback</button><p id="learningStatus" role="status"></p>`;
@@ -74,7 +74,7 @@
       $('memoryHealthStatus').textContent=
         'Qdrant: '+(d.qdrant_write_and_read_verified?'verified persistent read/write':d.qdrant_configured?'configured; read/write not verified':'not configured')+
         '. Embeddings: '+(d.neural_inference_verified?'Qdrant neural inference verified':d.free_embedding_fallback?'free deterministic fallback':'not verified')+
-        '. PostgreSQL backup: '+(d.postgres_backup_verified?'verified write':d.postgres_backup_configured?'configured; write failed':'not configured')+
+        '. PostgreSQL backup: '+(d.postgres_backup_read_verified?'verified write and recovery':d.postgres_backup_write_verified?'write verified; recovery not verified':d.postgres_backup_configured?'configured; write failed':'not configured')+
         '. Overall: '+d.status+'. '+Object.entries(d.provider_diagnostics||{}).map(([name,info])=>name+': '+(info.http_status?'HTTP '+info.http_status:info.error_type||'not configured')).join('; ')+'.';
     }catch(e){$('memoryHealthStatus').textContent=String(e.message);}
     finally{$('memoryHealthRun').disabled=false;}
