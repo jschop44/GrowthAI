@@ -35,6 +35,23 @@ const { chromium } = require('playwright');
         throw Error('Financial disclosure missing from report');
       if (!(await page.locator('#localOutput').innerText()).includes('Nearby Roofer'))
         throw Error('Competitor comparison missing from report');
+      await page.locator('#glPremium').waitFor();
+      if (!(await page.locator('#glPremium').innerText()).includes('Market intelligence overview'))
+        throw Error('Premium dashboard absent');
+      await page.locator('#glPremium input[aria-label="Search businesses"]').fill('nonmatching');
+      if (!(await page.locator('#glPremium').innerText()).includes('0 of 1 listings'))
+        throw Error('Business explorer search failed');
+      await page.locator('#glPremium input[aria-label="Search businesses"]').fill('Nearby');
+      if (!(await page.locator('#glPremium').innerText()).includes('1 of 1 listings'))
+        throw Error('Business explorer search reset failed');
+      await page.locator('#glVisits').fill('1000');
+      await page.locator('#glConversion').fill('2');
+      await page.locator('#glValue').fill('100');
+      await page.locator('#glUplift').fill('10');
+      await page.locator('#glCost').fill('0');
+      await page.locator('#glDelay').fill('0');
+      if (!(await page.locator('#glPremium .gl-result').innerText()).includes('$2,400'))
+        throw Error('Financial calculator returned incorrect first-year result');
       if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 3))
         throw Error('Report overflows mobile viewport '+viewport.width);
       if (errors.length) throw Error('Browser errors: '+errors.join('; '));
