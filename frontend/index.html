@@ -561,6 +561,7 @@ function render(data, createdAt = null) {
   const passedFindings=(data.findings||[]).filter(f=>f.passed);
   const renderFinding=f=>{
     const finance=f.financial_scenario;
+    const estimate=finance?money(finance.implementation_cost_usd.low)+"–"+money(finance.implementation_cost_usd.high):"";
     const steps=(f.implementation_steps||[]).map(step=>'<li>'+esc(step)+'</li>').join('');
     return "<article class='finding'><strong class='"+(f.passed?"ok":"bad")+"'>"+
       (f.passed?"✓ ":"Needs attention · ")+esc(f.name)+"</strong>"+
