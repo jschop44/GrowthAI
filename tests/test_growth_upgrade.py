@@ -90,3 +90,23 @@ def test_tamberinos_name_lookup_extracts_real_site_from_duckduckgo(monkeypatch):
     assert results
     assert results[0]['website']=='https://www.tamberinos.online/'
     assert results[0]['source']=='DuckDuckGo search suggestion'
+
+
+def test_business_lookup_rejects_unrelated_search_results_from_live_failure():
+    from backend import main
+    class Response:
+        status_code=200
+        text=('''<a href="https://support.google.com/websearch">feedback</a>
+                 <a href="https://my.malwarebytes.com/en/login">Malwarebytes</a>
+                 <a href="https://cloud.threatdown.com/auth/login">ThreatDown</a>
+                 <a href="https://www.tamberinos.online/">Tamberino's Pizza & Subs</a>''')
+        def raise_for_status(self): pass
+        def json(self): return []
+    class Client:
+        def get(self,url,**kwargs):
+            if 'duckduckgo.com' in url or 'bing.com' in url:
+                raise main.httpx.HTTPError('unavailable')
+            return Response()
+    result=main._business_candidates('Tamberinos',Client())
+    assert len(result)==1
+    assert result[0]['website']=='https://www.tamberinos.online/'
