@@ -4,7 +4,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GrowthLens AI | Website Audit</title>
+<title>Growth Lens | Website Intelligence</title>
+<link rel="icon" type="image/svg+xml" href="/growth-lens-logo.svg">
+<meta name="theme-color" content="#ffffff">
+<meta name="description" content="Growth Lens helps businesses discover website improvements with actionable audits and transparent financial scenarios.">
 <style>
 :root {
   font-family: system-ui, -apple-system, sans-serif;
@@ -362,12 +365,23 @@ footer{border-top:1px solid var(--gl-border);background:#fff;color:var(--gl-mute
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}button{transition:none}}
 @media print{html,body,.card,.finding,.financial{background:#fff!important;color:#172b36!important;box-shadow:none!important}header{position:static}}
 
+
+/* Concept 2 brand integration: logo, wordmark, print identity and small screens */
+header .brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#142e3e;font-size:21px;font-weight:800;letter-spacing:-.045em;white-space:nowrap}
+header .brand:hover{color:#142e3e}
+.brand-logo{width:43px;height:43px;display:block;flex:none}
+.brand-lens{color:#168260}
+footer{display:flex;align-items:center;justify-content:center;gap:8px}
+footer img{display:block}
+#reportHeader .kicker{color:#116a5c}
+@media(max-width:460px){header .brand{font-size:18px}.brand-logo{width:36px;height:36px}}
+@media print{header .brand{color:#142e3e!important}#reportHeader .kicker{color:#116a5c!important}}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="brand"><span class="brand-mark" aria-hidden="true">↗</span>GrowthLens <span style="font-weight:500;color:#64748b">AI</span></div>
+  <a class="brand" href="/" aria-label="Growth Lens home"><img class="brand-logo" src="/growth-lens-logo.svg" width="43" height="43" alt="" decoding="async"><span>Growth <span class="brand-lens">Lens</span></span></a>
   <div class="tag">● Private beta</div>
 </header>
 
@@ -458,7 +472,7 @@ footer{border-top:1px solid var(--gl-border);background:#fff;color:var(--gl-mute
     </button>
 
     <div id="reportFooter" class="report-only">
-      Prepared by GrowthLens AI. This automated audit examines
+      Prepared by Growth Lens. This automated audit examines
       one publicly accessible page only. The score is a technical
       checklist score, not a measure of business growth, search
       rankings, traffic, competitor performance, or revenue.
@@ -483,7 +497,7 @@ footer{border-top:1px solid var(--gl-border);background:#fff;color:var(--gl-mute
   </section>
 </main>
 
-<footer>GrowthLens AI · Development MVP</footer>
+<footer><img src="/growth-lens-logo.svg" width="22" height="22" alt=""> <span>Growth Lens · Private beta</span></footer>
 
 <script>
 "use strict";
