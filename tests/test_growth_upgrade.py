@@ -110,3 +110,31 @@ def test_business_lookup_rejects_unrelated_search_results_from_live_failure():
     result=main._business_candidates('Tamberinos',Client())
     assert len(result)==1
     assert result[0]['website']=='https://www.tamberinos.online/'
+
+
+def test_robots_decision_distinguishes_disallowed_and_unverified():
+    from backend import main
+    class Response:
+        def __init__(self,code,text=''):
+            self.status_code=code
+            self.text=text
+    class Client:
+        def __init__(self,code,text=''):
+            self.code=code
+            self.text=text
+        def get(self,*args,**kwargs):
+            return Response(self.code,self.text)
+    assert main.robots_decision(Client(200,'User-agent: *\\nDisallow: /'),'https://example.com/')[0]=='disallowed'
+    assert main.robots_decision(Client(403),'https://example.com/')[0]=='unverified'
+    assert main.robots_decision(Client(404),'https://example.com/')[0]=='allowed'
+
+
+def test_public_intelligence_fallback_never_invents_page_score_or_revenue():
+    from backend import main
+    result=main.public_intelligence_fallback('https://example.com/','disallowed','robots.txt disallows')
+    assert result['status']=='partial'
+    assert result['score'] is None
+    assert result['observations']['website_html_inspected'] is False
+    assert result['robots_status']=='disallowed'
+    assert all(f['financial_scenario']['confidence']=='not_estimable' for f in result['findings'])
+    assert all(f['financial_scenario']['annual_incremental_revenue_usd']==0 for f in result['findings'])
