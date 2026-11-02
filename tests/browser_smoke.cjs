@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+
 (async () => {
   const browser = await chromium.launch({headless:true});
   try {
@@ -6,74 +7,39 @@ const { chromium } = require('playwright');
       const page = await browser.newPage({viewport});
       const errors = [];
       page.on('pageerror', e => errors.push(e.message));
-      await page.goto('http://127.0.0.1:8000/', {waitUntil:'networkidle'});
-      await page.locator('#localCompetition').waitFor();
-      if (!(await page.locator('#publicIntelRun').isVisible())) throw Error('Unified intelligence button missing');
-      if (!(await page.locator('#memoryHealthStatus').count())) throw Error('Automatic memory status missing');
-      if (await page.locator('#memoryHealthRun').isVisible()) throw Error('Manual memory diagnostic should be hidden');
-      if (!(await page.locator('input[name="localRadius"]').count() === 3)) throw Error('Radius controls missing');
-      await page.locator('input[name="localRadius"][value="50"]').check();
-      if (!(await page.locator('#publicIntelRun').innerText()).includes('50 miles')) throw Error('Radius selection not reflected');
-      if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 3))
-        throw Error('Horizontal viewport overflow at '+viewport.width);
-      await page.locator('#url').fill('https://example.com');
-      await page.locator('#publicIntelRun').click();
-      await page.locator('#publicIntelStatus').getByText('Enter your access key').waitFor();
-      await page.route('**/api/intelligence-team', route => route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
-        status:'complete_with_partial_results',
-        engines:{
-          website:{status:'available',source:'website',identity:{name:'Sample Roofing'},classification:{label:'Roofing contractor',confidence:'high'}},
-          discovery:{status:'available',source:'Geoapify / Overpass',competitors:[{name:'Nearby Roofer',distance_miles:2,source_providers:['Geoapify','Overpass']}]},
-          pagespeed_mobile:{status:'unavailable',reason:'Synthetic provider outage'},
-          verification:{status:'available',source:'Evidence registry',reconciliation:{conflicts:[]}},
-          opportunities:{status:'available',recommendations:[{issue:'Local presence',recommendation:'Review local competition',evidence:'Public listing'}]}
-        },
-        memory:{prior_observations:1,new_observations:2,persistent:true,neural_embeddings:true},
-        limitations:['Synthetic test data only']
-      })}));
+      await page.goto('http://127.0.0.1:8000/', {waitUntil:'domcontentloaded'});
+      await page.locator('#auditForm').waitFor();
+      if (!(await page.locator('#auditButton').isVisible())) throw Error('Audit action missing');
+      if (!(await page.locator('#scenarioForm').count())) throw Error('Scenario calculator missing');
       await page.locator('#privateKey').fill('testing-secret');
-      await page.locator('#publicIntelRun').click();
-      await page.locator('#localOutput').getByText('Nearby Roofer').waitFor();
-      if (!(await page.locator('#localOutput').innerText()).includes('Review local competition'))
-        throw Error('Evidence-supported opportunity missing');
-      if (!(await page.locator('#publicIntelOutput').innerText()).includes('Intelligence memory'))
-        throw Error('Memory status missing');
-      if (await page.locator('#localRun').count()) throw Error('Redundant competition button should be removed');
-      if (await page.locator('#glVisits').count()) throw Error('Manual financial calculator should be removed');
-      if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 3))
-        throw Error('Report overflows mobile viewport '+viewport.width);
-      // A blocked robots check must fall back to permitted public providers.
-      await page.route('**/api/audits', route => {
-        if(route.request().method()==='POST') return route.fulfill({status:422,contentType:'application/json',
-          body:JSON.stringify({detail:'Website robots.txt does not permit this audit, or could not be checked.'})});
-        return route.fulfill({status:200,contentType:'application/json',body:'[]'});
-      });
-      await page.route('**/api/public-intelligence', route => route.fulfill({
-        status:200,contentType:'application/json',
-        body:JSON.stringify({status:'completed_with_independent_provider_results',
-          engines:{pagespeed_mobile:{status:'available',performance_score:86},
-            pagespeed_desktop:{status:'unavailable',reason:'No provider data'},
-            corporate_filings:{status:'not_requested'}}})
-      }));
-      await page.locator('#url').fill('https://apple.com');
-      await page.locator('#auditButton').click();
-      await page.locator('#status').getByText('Independent public-source results',{exact:false}).waitFor();
-      const fallbackText=await page.locator('#status').innerText();
-      if(!fallbackText.includes('86/100') || !fallbackText.includes('not a completed website audit'))
-        throw Error('Blocked audit public-data fallback not displayed correctly');
       await page.route('**/api/business-lookup', route => route.fulfill({
-        status:200,contentType:'application/json',body:JSON.stringify({status:'matches',matches:[
-          {name:'Sample Pizza',address:'Main Street, Bel Air',website:'https://example.com'}
+        status:200,contentType:'application/json',
+        body:JSON.stringify({status:'matches',matches:[
+          {name:'Tamberinos Pizza',address:'Sample Street, Maryland',
+           website:'https://example.com',source:'Synthetic test fixture'}
         ]})
       }));
-      await page.locator('#url').fill('Sample Pizza Bel Air');
+      await page.locator('#url').fill('Tamberinos pizza');
       await page.locator('#auditButton').click();
-      await page.locator('#businessMatches').getByText('Sample Pizza',{exact:false}).waitFor();
-      if(!(await page.locator('#businessMatches').innerText()).includes('Main Street'))
-        throw Error('Business selection lacks distinguishing address');
+      await page.locator('#businessMatches').getByText('Tamberinos Pizza',{exact:false}).waitFor();
+      if (!(await page.locator('#businessMatches').innerText()).includes('Sample Street'))
+        throw Error('Business results must show distinguishing location');
+      await page.route('**/api/financial-estimate', route => route.fulfill({
+        status:200,contentType:'application/json',
+        body:JSON.stringify({annual_incremental_revenue_usd:2400,
+          annual_incremental_gross_profit_usd:480,
+          estimated_downtime_sales_loss_usd:0,
+          first_year_total_cost_usd:740,
+          first_year_net_contribution_usd:-260,
+          payback_months:25,note:'Synthetic scenario, not a forecast'})
+      }));
+      await page.locator('#scenarioForm button[type=submit]').click();
+      await page.locator('#scenarioResult').getByText('Hypothetical annual added sales',{exact:false}).waitFor();
+      if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 3))
+        throw Error('Horizontal viewport overflow at '+viewport.width);
       if (errors.length) throw Error('Browser errors: '+errors.join('; '));
       await page.close();
     }
-    console.log('Mobile and desktop browser smoke tests passed');
+    console.log('GrowthLens mobile and desktop smoke tests passed');
   } finally { await browser.close(); }
 })().catch(err=>{console.error(err);process.exit(1)});
