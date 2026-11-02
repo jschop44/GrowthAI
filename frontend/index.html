@@ -380,6 +380,8 @@ footer img{display:block}
 .public-fallback #summary{background:#fff9ed;border-color:#eed7a4}
 .public-fallback #summary .score{font-size:clamp(25px,4vw,38px);letter-spacing:-.04em;color:#855b1b}
 .public-fallback #aiButton{display:none}
+
+.gl-intel{padding:16px 0;color:var(--gl-ink)}.gl-intel h3{margin:20px 0 10px}.gl-intel-metric{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--gl-border);padding:10px 0}.gl-intel-metric strong{color:var(--gl-primary);font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -664,6 +666,34 @@ function render(data, createdAt = null) {
   }
 
   populateReport(data);
+  if (isPublicFallback) {
+    const intel=data.third_party_intelligence||{};
+    const perf=intel.performance||{};
+    const directory=intel.business_directory||{};
+    const metrics=perf.metrics||{};
+    const pretty={lighthouse_performance_score:"Mobile Lighthouse score",
+      first_contentful_paint_ms:"First contentful paint (ms)",
+      largest_contentful_paint_ms:"Largest contentful paint (ms)",
+      total_blocking_time_ms:"Total blocking time (ms)",
+      cumulative_layout_shift:"Layout shift",
+      speed_index_ms:"Speed index (ms)"};
+    const metricRows=Object.entries(metrics).map(([k,v])=>
+      "<div class='gl-intel-metric'><span>"+esc(pretty[k]||k)+"</span><strong>"+esc(v)+"</strong></div>").join("");
+    const listings=(directory.matches||[]).map(item=>
+      "<div class='finding'><strong>"+esc(item.name)+"</strong><p>"+esc(item.address)+"</p><p class='muted small'>Source: "+esc(item.source)+" · "+esc(item.website)+"</p></div>").join("");
+    $("extras").innerHTML="<section class='gl-intel'><h3>Independent performance measurements</h3>"+
+      "<p class='muted small'>"+esc(perf.source||"Google PageSpeed Insights")+
+      " · "+esc(perf.status||"unavailable")+"</p>"+
+      (metricRows||"<p>No third-party performance metrics available for this site.</p>")+
+      "<p class='muted small'>"+esc(perf.note||"")+"</p>"+
+      "<h3>Business-directory intelligence</h3>"+
+      "<p class='muted small'>"+esc(directory.source||"OpenStreetMap")+" · "+
+      esc(directory.status||"unavailable")+"</p>"+
+      (listings||"<p>No domain-matched business directory listing was found.</p>")+
+      "<p class='muted small'>"+esc(directory.note||"")+"</p></section>";
+  }
+
+
 
   $("summary").innerHTML =
     "<div class='score'>" +
