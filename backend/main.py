@@ -556,14 +556,15 @@ def collect_third_party_intelligence(client,url):
     """Best-effort, source-attributed intelligence without fetching target HTML."""
     host=(urlparse(url).hostname or '').lower().removeprefix('www.')
     name=host.split('.')[0].replace('-',' ').replace('_',' ')
-    result={'performance':{'status':'unavailable','source':'Google PageSpeed Insights API',
+    result={'domain_metadata':{'status':'verified','source':'Validated public URL','host':host,'https_url_supplied':urlparse(url).scheme=='https'},
+            'performance':{'status':'unavailable','source':'Google PageSpeed Insights API',
                            'metrics':{},'note':'No third-party performance measurements returned.'},
             'business_directory':{'status':'unavailable','source':'OpenStreetMap Nominatim',
                                   'matches':[],'note':'Directory entries are unverified suggestions, not ownership proof.'}}
     try:
         response=client.get('https://www.googleapis.com/pagespeedonline/v5/runPagespeed',
             params={'url':url,'strategy':'mobile','category':'performance'},
-            headers={'Accept':'application/json','User-Agent':AGENT},timeout=14)
+            headers={'Accept':'application/json','User-Agent':AGENT},timeout=6)
         if response.status_code==200:
             payload=response.json()
             audits=(payload.get('lighthouseResult') or {}).get('audits') or {}
