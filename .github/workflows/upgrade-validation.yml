@@ -4,6 +4,7 @@ on:
     branches: [growthlens-v1-1-review, main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -16,7 +17,8 @@ jobs:
         with:
           node-version: '22'
       - run: pip install -r requirements.txt
-      - run: PYTHONPATH=. python -m pytest -q tests
+      - name: Python regression suite
+        run: PYTHONPATH=. python -m pytest -ra -vv tests
       - run: python -m compileall -q backend
       - run: node --check frontend/local-competition.js
       - run: node --check frontend/local-premium.js
@@ -27,5 +29,7 @@ jobs:
           GROWTHLENS_PRIVATE_KEY=testing-secret python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/api/health && break || sleep 1; done
           node tests/browser_smoke.cjs
-      - run: docker build -t growthlens-validation .
-      - run: python -c "from backend.main import app; from fastapi.testclient import TestClient; c=TestClient(app); assert c.get('/api/health').status_code==200; assert c.post('/api/local-competition',json={'url':'https://example.com','radius_miles':15}).status_code==401"
+      - name: Docker image build
+        run: docker build -t growthlens-validation .
+      - name: API authentication smoke test
+        run: python -c "from backend.main import app; from fastapi.testclient import TestClient; c=TestClient(app); assert c.get('/api/health').status_code==200; assert c.post('/api/local-competition',json={'url':'https://example.com','radius_miles':15}).status_code==401"
