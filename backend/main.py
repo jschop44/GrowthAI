@@ -67,6 +67,28 @@ class AuditRequest(BaseModel):
 class BusinessLookupRequest(BaseModel):
     query: str = Field(min_length=2, max_length=180)
 
+def _candidate_url(raw):
+    """Normalize public search suggestions without DNS lookups.
+
+    A search listing is not an audit target: validate_url performs full DNS and
+    public-IP validation when the user selects a site for auditing.
+    """
+    if not isinstance(raw,str) or not raw.strip():
+        raise ValueError('Missing candidate URL')
+    parsed=urlparse(raw.strip())
+    if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password or parsed.port not in (None,80,443):
+        raise ValueError('Unsupported candidate URL')
+    hostname=parsed.hostname.lower().rstrip('.')
+    if hostname=='localhost' or hostname.endswith(('.localhost','.local','.internal')):
+        raise ValueError('Private candidate hostname')
+    try:
+        if not ipaddress.ip_address(hostname).is_global:
+            raise ValueError('Private candidate IP')
+    except ValueError as exc:
+        if 'Private candidate IP' in str(exc):
+            raise
+    return parsed._replace(fragment='').geturl()
+
 def _business_candidates(query, client):
     """Discover websites from independent public directory/search listings."""
     candidates=[]
@@ -75,7 +97,7 @@ def _business_candidates(query, client):
         if not website or not isinstance(website,str):
             return
         try:
-            url=validate_url(website)
+            url=_candidate_url(website)
         except (ValueError,TypeError):
             return
         host=urlparse(url).hostname.lower().removeprefix('www.')
