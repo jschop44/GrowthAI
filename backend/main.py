@@ -552,7 +552,69 @@ def robots_allowed(client,url):
     return robots_decision(client,url)[0]=='allowed'
 
 
-def public_intelligence_fallback(url,state,reason):
+def collect_third_party_intelligence(client,url):
+    """Best-effort, source-attributed intelligence without fetching target HTML."""
+    host=(urlparse(url).hostname or '').lower().removeprefix('www.')
+    name=host.split('.')[0].replace('-',' ').replace('_',' ')
+    result={'performance':{'status':'unavailable','source':'Google PageSpeed Insights API',
+                           'metrics':{},'note':'No third-party performance measurements returned.'},
+            'business_directory':{'status':'unavailable','source':'OpenStreetMap Nominatim',
+                                  'matches':[],'note':'Directory entries are unverified suggestions, not ownership proof.'}}
+    try:
+        response=client.get('https://www.googleapis.com/pagespeedonline/v5/runPagespeed',
+            params={'url':url,'strategy':'mobile','category':'performance'},
+            headers={'Accept':'application/json','User-Agent':AGENT},timeout=14)
+        if response.status_code==200:
+            payload=response.json()
+            audits=(payload.get('lighthouseResult') or {}).get('audits') or {}
+            categories=(payload.get('lighthouseResult') or {}).get('categories') or {}
+            score=(categories.get('performance') or {}).get('score')
+            metrics={}
+            for metric,key in [('first_contentful_paint_ms','first-contentful-paint'),
+                               ('largest_contentful_paint_ms','largest-contentful-paint'),
+                               ('total_blocking_time_ms','total-blocking-time'),
+                               ('cumulative_layout_shift','cumulative-layout-shift'),
+                               ('speed_index_ms','speed-index')]:
+                value=(audits.get(key) or {}).get('numericValue')
+                if isinstance(value,(int,float)) and not isinstance(value,bool):
+                    metrics[metric]=round(value,3)
+            if isinstance(score,(int,float)):
+                metrics['lighthouse_performance_score']=round(score*100)
+            if metrics:
+                result['performance']={'status':'measured_by_third_party',
+                    'source':'Google PageSpeed Insights API / Lighthouse mobile',
+                    'metrics':metrics,'note':'Third-party lab measurements; not first-party site crawl or actual user conversions.'}
+        else:
+            result['performance']['note']='PageSpeed API unavailable (HTTP '+str(response.status_code)+'); no performance score inferred.'
+    except (httpx.HTTPError,ValueError,TypeError,KeyError):
+        pass
+    try:
+        response=client.get('https://nominatim.openstreetmap.org/search',
+            params={'q':name,'format':'json','extratags':1,'addressdetails':1,'limit':8},
+            headers={'User-Agent':AGENT,'Accept':'application/json'},timeout=8)
+        if response.status_code==200:
+            items=response.json()
+            matches=[]
+            for item in items if isinstance(items,list) else []:
+                tags=item.get('extratags') or {}
+                website=tags.get('website') or tags.get('contact:website') or ''
+                listed_host=(urlparse(website if '://' in website else 'https://'+website).hostname or '').lower().removeprefix('www.') if website else ''
+                if listed_host != host:
+                    continue
+                matches.append({'name':str(item.get('name') or item.get('display_name') or '')[:160],
+                    'address':str(item.get('display_name') or '')[:250],
+                    'website':website[:250],
+                    'osm_type':str(item.get('type') or '')[:60],
+                    'source':'OpenStreetMap Nominatim'})
+            result['business_directory']['matches']=matches[:5]
+            result['business_directory']['status']='matches' if matches else 'no_verified_domain_matches'
+            result['business_directory']['note']='Directory records matched the supplied website domain; entries are community-maintained and may be outdated.'
+    except (httpx.HTTPError,ValueError,TypeError,AttributeError):
+        pass
+    return result
+
+
+def public_intelligence_fallback(url,state,reason,third_party=None):
     """No site HTML is requested. Never infer on-page SEO or conversion defects."""
     host=urlparse(url).hostname or ''
     # validate_url already verified the host resolves only to public addresses.
@@ -586,6 +648,7 @@ def public_intelligence_fallback(url,state,reason):
           'payback_months':None,'confidence':'not_estimable',
           'note':'No page-level evidence or business financial data; revenue and savings cannot be estimated responsibly.'}
     return {'url':url,'status':'partial','audit_mode':'public_intelligence',
+            'third_party_intelligence':third_party or {},
             'score':None,'max_score':None,'scoring_scope':'Public-domain metadata only; no website crawl or technical score.',
             'findings':findings,'observations':observations,
             'robots_status':state,'robots_explanation':reason,
@@ -630,7 +693,8 @@ def create_audit(body: AuditRequest):
         with httpx.Client(trust_env=False) as client:
             robots_state,robots_reason=robots_decision(client,url)
             if robots_state!='allowed':
-                result=public_intelligence_fallback(url,robots_state,robots_reason)
+                third_party=collect_third_party_intelligence(client,url)
+                result=public_intelligence_fallback(url,robots_state,robots_reason,third_party)
                 with database() as conn:
                     conn.execute('UPDATE audits SET status=?,score=?,result_json=? WHERE id=?',
                                  ('partial',None,json.dumps(result),audit_id))
