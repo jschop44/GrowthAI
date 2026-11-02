@@ -138,3 +138,41 @@ def test_public_intelligence_fallback_never_invents_page_score_or_revenue():
     assert result['robots_status']=='disallowed'
     assert all(f['financial_scenario']['confidence']=='not_estimable' for f in result['findings'])
     assert all(f['financial_scenario']['annual_incremental_revenue_usd']==0 for f in result['findings'])
+
+
+def test_third_party_intelligence_collects_metrics_and_domain_matched_directory():
+    from backend import main
+    class Response:
+        status_code=200
+        def __init__(self,data): self.data=data
+        def json(self): return self.data
+    class Client:
+        def get(self,url,**kwargs):
+            if 'pagespeedonline' in url:
+                return Response({'lighthouseResult':{
+                    'categories':{'performance':{'score':0.87}},
+                    'audits':{'largest-contentful-paint':{'numericValue':2345},
+                              'cumulative-layout-shift':{'numericValue':0.07}}}})
+            if 'nominatim' in url:
+                return Response([
+                    {'name':'Sample Pizza','display_name':'Sample Pizza, Test City',
+                     'extratags':{'website':'https://example.com'}},
+                    {'name':'Unrelated','display_name':'Unrelated',
+                     'extratags':{'website':'https://unrelated.test'}}])
+            raise AssertionError(url)
+    result=main.collect_third_party_intelligence(Client(),'https://example.com/')
+    assert result['performance']['status']=='measured_by_third_party'
+    assert result['performance']['metrics']['lighthouse_performance_score']==87
+    assert result['performance']['metrics']['largest_contentful_paint_ms']==2345
+    assert len(result['business_directory']['matches'])==1
+    assert result['business_directory']['matches'][0]['name']=='Sample Pizza'
+
+
+def test_third_party_intelligence_handles_provider_outages():
+    from backend import main
+    class Client:
+        def get(self,*args,**kwargs):
+            raise main.httpx.HTTPError('provider unavailable')
+    result=main.collect_third_party_intelligence(Client(),'https://example.com/')
+    assert result['performance']['status']=='unavailable'
+    assert result['business_directory']['matches']==[]
