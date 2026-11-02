@@ -176,7 +176,6 @@ def _business_candidates(query, client):
                 params={'q':query+' official business website','format':'rss'},
                 headers={'User-Agent':AGENT,'Accept':'application/rss+xml'},timeout=10)
             response.raise_for_status()
-            from xml.etree import ElementTree
             rss=ElementTree.fromstring(response.text[:250000])
             for item in rss.findall('.//item')[:8]:
                 link=item.findtext('link','').strip()
