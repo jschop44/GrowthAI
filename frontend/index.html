@@ -642,6 +642,23 @@ function populateReport(data) {
     company + " | Website Audit";
   $("reportCompanyLogo").textContent = company.slice(0,2).toUpperCase();
   $("reportBusinessLogo").hidden = true;
+  const logoUrl = typeof data.business_logo_url==="string" ? data.business_logo_url : "";
+  if (logoUrl && /^https:\/\//i.test(logoUrl)) {
+    try {
+      const logoHost=new URL(logoUrl).hostname.toLowerCase();
+      if (logoHost===host.toLowerCase()) {
+        $("reportBusinessLogo").src=logoUrl;
+        $("reportBusinessLogo").hidden=false;
+        $("reportCompanyLogo").hidden=true;
+        $("reportBusinessLogo").onerror=()=>{
+          $("reportBusinessLogo").hidden=true;
+          $("reportCompanyLogo").hidden=false;
+        };
+      }
+    } catch {}
+  } else {
+    $("reportCompanyLogo").hidden=false;
+  }
   $("reportCompanyName").textContent = company;
 
   $("reportWebsite").textContent =
