@@ -148,25 +148,29 @@ def _business_candidates(query, client):
                 break
     except (httpx.HTTPError,ValueError):
         pass
-    # DuckDuckGo's HTML endpoint offers an additional independent free discovery path.
-    # Search links are suggestions only; do not claim verified ownership.
+    # Independent HTML search, including redirect URLs used by DuckDuckGo.
     if len(candidates) < 3:
         try:
-            response=client.get('https://www.google.com/search',
-                params={'q':query+' business website','gbv':'1'},
+            response=client.get('https://html.duckduckgo.com/html/',
+                params={'q':query+' official website'},
                 headers={'User-Agent':'Mozilla/5.0','Accept':'text/html'},timeout=8)
-            if response.status_code == 200:
-                soup=BeautifulSoup(response.text[:400000],'html.parser')
-                for a in soup.select('a[href]'):
-                    href=a.get('href','')
-                    if href.startswith('/url?'):
-                        from urllib.parse import parse_qs
-                        href=parse_qs(urlparse(href).query).get('q',[''])[0]
-                    if href.startswith('https://'):
-                        host=(urlparse(href).hostname or '').lower()
-                        if not any(host==x or host.endswith('.'+x) for x in
-                           ('google.com','facebook.com','instagram.com','yelp.com','youtube.com','linkedin.com','tripadvisor.com')):
-                            add(a.get_text(' ',strip=True) or query,'',href,'Public search suggestion')
+            response.raise_for_status()
+            soup=BeautifulSoup(response.text[:400000],'html.parser')
+            from urllib.parse import parse_qs, unquote
+            for a in soup.select('a.result__a[href], a[href*="uddg="]'):
+                href=a.get('href','')
+                if 'uddg=' in href:
+                    href=unquote(parse_qs(urlparse(href).query).get('uddg',[''])[0])
+                if href.startswith('//'):
+                    href='https:'+href
+                if not href.startswith('https://'):
+                    continue
+                host=(urlparse(href).hostname or '').lower().removeprefix('www.')
+                if any(host==x or host.endswith('.'+x) for x in
+                       ('duckduckgo.com','google.com','facebook.com','instagram.com',
+                        'yelp.com','youtube.com','linkedin.com','tripadvisor.com')):
+                    continue
+                add(a.get_text(' ',strip=True) or query,'',href,'DuckDuckGo search suggestion')
         except (httpx.HTTPError,ValueError):
             pass
     if len(candidates) < 3:
