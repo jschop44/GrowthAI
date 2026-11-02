@@ -382,6 +382,17 @@ footer img{display:block}
 .public-fallback #aiButton{display:none}
 
 .gl-intel{padding:16px 0;color:var(--gl-ink)}.gl-intel h3{margin:20px 0 10px}.gl-intel-metric{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--gl-border);padding:10px 0}.gl-intel-metric strong{color:var(--gl-primary);font-variant-numeric:tabular-nums}
+
+/* Collapsible recommendations and dual-brand report identity */
+.recommendation-details>summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:750;list-style:none;padding:4px 0}
+.recommendation-details>summary::-webkit-details-marker{display:none}
+.recommendation-details>summary:after{content:"⌄";color:#116a5c;font-size:22px;transition:transform .2s}
+.recommendation-details:not([open])>summary:after{transform:rotate(-90deg)}
+.recommendation-details>summary:focus-visible,.steps-details>summary:focus-visible{outline:3px solid #67b7a1;outline-offset:4px;border-radius:4px}
+.recommendation-body{padding:10px 0 0}.finding-weight{font-size:12px;font-weight:600;color:#64748b;margin-left:auto}
+.report-brand{display:flex;align-items:center;gap:12px;margin-bottom:16px}.report-brand img{width:58px;height:58px;object-fit:contain}.report-wordmark{font-size:24px;font-weight:800;color:#142e3e;letter-spacing:-.05em}.report-wordmark span{color:#168260}
+.report-client{display:flex;align-items:center;gap:10px;margin:12px 0}.report-client-monogram{display:grid;place-items:center;width:40px;height:40px;border-radius:9px;background:#e8f4ef;color:#116a5c;font-weight:800}.report-client-label{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.09em}.report-client strong{font-size:17px;color:#142e3e}
+@media print{.recommendation-details:not([open])>.recommendation-body{display:block!important}.recommendation-details>summary:after{display:none}.steps-details:not([open])>ol,.steps-details:not([open])>p{display:block!important}.report-brand,.report-client{break-inside:avoid}.report-brand img{width:58px;height:58px}}
 </style>
 </head>
 <body>
@@ -431,9 +442,8 @@ footer img{display:block}
   <section class="card hidden" id="results">
 
     <div id="reportHeader" class="report-only">
-      <div class="kicker">
-        GROWTHLENS AI / CLIENT WEBSITE AUDIT
-      </div>
+      <div class="report-brand"><img src="/growth-lens-logo.svg" width="58" height="58" alt="Growth Lens logo"><div><div class="report-wordmark">Growth <span>Lens</span></div><div class="kicker">CLIENT WEBSITE INTELLIGENCE REPORT</div></div></div>
+      <div class="report-client"><div class="report-client-monogram" id="reportCompanyLogo" aria-hidden="true">CO</div><div><div class="report-client-label">Prepared for</div><strong id="reportCompanyName">Company</strong></div></div>
       <h1 id="reportCompany">Website Audit</h1>
       <div class="report-meta">
         <span id="reportWebsite"></span>
@@ -603,6 +613,8 @@ function populateReport(data) {
 
   $("reportCompany").textContent =
     company + " | Website Audit";
+  $("reportCompanyLogo").textContent = company.slice(0,2).toUpperCase();
+  $("reportCompanyName").textContent = company;
 
   $("reportWebsite").textContent =
     data.url || host;
@@ -720,13 +732,13 @@ function render(data, createdAt = null) {
       " · First-year net contribution: "+esc(money(finance.first_year_net_contribution_usd??0))+
       "</p><p class='muted small'>"+esc(finance.note||"Illustrative only; not measured.")+"</p></div>":"";
     const steps=(f.implementation_steps||[]).map(step=>'<li>'+esc(step)+'</li>').join('');
-    return "<article class='finding'><strong class='"+(f.passed?"ok":"bad")+"'>"+
-      (f.passed?"✓ ":"Needs attention · ")+esc(f.name)+"</strong>"+
-      (f.weight?" · "+esc(f.weight)+" points":" · Additional diagnostic")+
-      "<p>"+esc(f.passed?"Check passed.":f.recommendation)+"</p>"+(!f.passed?scenario:"")+
-      (!f.passed&&steps?"<details open><summary>Step-by-step implementation</summary><ol>"+steps+
+    return "<article class='finding'><details class='recommendation-details' open><summary><span class='"+(f.passed?"ok":"bad")+"'>"+
+      (f.passed?"✓ ":"Needs attention · ")+esc(f.name)+"</span>"+
+      "<span class='finding-weight'>"+(f.weight?esc(f.weight)+" points":"Additional diagnostic")+"</span></summary>"+
+      "<div class='recommendation-body'><p>"+esc(f.passed?"Check passed.":f.recommendation)+"</p>"+(!f.passed?scenario:"")+
+      (!f.passed&&steps?"<details class='steps-details' open><summary>Step-by-step implementation</summary><ol>"+steps+
         "</ol><p class='muted small'>"+esc(f.verification||'Re-run the audit after publishing.')+"</p></details>":"")+
-      "</article>";
+      "</div></details></article>";
   };
   $("findings").innerHTML=
     "<h4>Recommended actions ("+failedFindings.length+")</h4>"+
