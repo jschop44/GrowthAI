@@ -300,51 +300,112 @@ button:hover:not(:disabled){filter:brightness(1.12)}
 .financial{line-height:1.65;border-color:#4b7876}
 @media(prefers-reduced-motion:reduce){button{transition:none}html{scroll-behavior:auto}}
 @media print{body{background:white!important;color:#172b36!important}}
+
+/* GrowthLens unified product design system — 2026 */
+:root{color-scheme:light;--gl-bg:#f5f7fb;--gl-card:#fff;--gl-ink:#152438;--gl-muted:#64748b;--gl-border:#dfe6ee;--gl-primary:#116a5c;--gl-primary-hover:#0c5349;--gl-soft:#eaf7f2;--gl-shadow:0 12px 34px rgba(28,46,72,.055)}
+html{scroll-behavior:smooth}
+body{background:var(--gl-bg);color:var(--gl-ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.55}
+header{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.95);border-bottom:1px solid var(--gl-border);backdrop-filter:blur(18px);padding:15px max(20px,calc((100vw - 1160px)/2))}
+.brand{color:var(--gl-ink);font-size:20px;letter-spacing:-.045em;display:flex;align-items:center;gap:10px}
+.brand-mark{display:inline-grid;place-items:center;background:var(--gl-primary);color:white;border-radius:11px;width:36px;height:36px;font-size:20px}
+header .tag{border:1px solid #c8e6da;border-radius:999px;padding:6px 12px;background:var(--gl-soft);color:#176858;font-weight:650;font-size:12px}
+main{max-width:1160px;padding:36px 20px 60px}
+main>h1{font-size:clamp(2.1rem,4.6vw,3.4rem);font-weight:800;letter-spacing:-.06em;line-height:1.12;margin:8px 0 12px;max-width:800px;color:var(--gl-ink)}
+main>p.muted{font-size:16px;line-height:1.7;margin:0 0 28px;max-width:700px}
+.muted,.tag{color:var(--gl-muted)}
+.card{background:var(--gl-card);border:1px solid var(--gl-border);border-radius:18px;box-shadow:var(--gl-shadow);padding:clamp(20px,3vw,28px);margin-bottom:18px;color:var(--gl-ink)}
+.card h2{color:var(--gl-ink);font-size:20px;letter-spacing:-.035em;margin:0 0 10px}
+.card h3{color:var(--gl-ink)}
+label{font-size:13px;font-weight:650;color:#34465c;margin:12px 0 7px}
+input,select{background:#fff;color:var(--gl-ink);border:1px solid #cbd6e2;border-radius:10px;padding:12px 13px;min-height:46px;box-shadow:0 1px 2px #102c4307}
+input::placeholder{color:#8a98a9}
+input:focus-visible,button:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid #56bfa4;outline-offset:2px}
+button{background:var(--gl-primary);color:white;border:1px solid var(--gl-primary);border-radius:10px;min-height:44px;padding:11px 18px;font-weight:700;transition:background .15s,transform .15s,box-shadow .15s}
+button:hover:not(:disabled){background:var(--gl-primary-hover);filter:none;box-shadow:0 5px 14px #116a5c22}
+button:active:not(:disabled){transform:translateY(1px)}
+button:disabled{opacity:.58}
+#businessMatches button{background:#f5faf8;color:#1d4039;border:1px solid #cde4db;box-shadow:none;text-align:left;width:100%}
+#businessMatches button:hover{background:#e7f5ee}
+#status:not(:empty){background:#f1f7fb;border:1px solid #dce8f1;border-radius:10px;padding:12px 14px;margin:14px 0;color:#34516a}
+#results{scroll-margin-top:90px}
+#summary{background:#f1f8f5;border:1px solid #d7e9e1;border-radius:14px;padding:18px 20px;margin:16px 0}
+#summary .score{color:var(--gl-primary);font-size:clamp(42px,7vw,64px)}
+.finding{background:#fff;color:var(--gl-ink);border:1px solid var(--gl-border);border-left:4px solid #37a58a;border-radius:12px;margin:10px 0;padding:16px 18px}
+.finding details{border-color:var(--gl-border)}
+.finding summary{color:#116a5c}
+.finding p,.financial p{color:#52657a}
+.ok{color:#16765d}.bad{color:#b45430}
+.financial{background:#f4f9f7;color:var(--gl-ink);border:1px solid #d8e9e2;border-radius:12px}
+a{color:#116a5c}
+#scenarioForm{grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:8px 18px}
+#scenarioForm label{margin:0;align-self:end}
+#scenarioForm input{margin-top:7px}
+#scenarioForm button{align-self:end;margin:0;min-height:46px}
+#scenarioPanel{scroll-margin-top:90px}
+#history{line-height:1.7}
+footer{border-top:1px solid var(--gl-border);background:#fff;color:var(--gl-muted);font-size:12px}
+.gl-eyebrow{color:#116a5c;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin:0 0 10px}
+.gl-hero{padding:0 0 8px}
+.gl-hero .gl-subline{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.gl-chip{display:inline-flex;align-items:center;border:1px solid #dce6ed;border-radius:999px;padding:6px 11px;font-size:12px;font-weight:650;color:#486075;background:#fff}
+.gl-workspace{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(265px,.85fr);gap:18px;align-items:stretch;margin-bottom:18px}
+.gl-workspace>.card{margin:0}
+.gl-workspace .gl-audit{border-color:#cbded7;box-shadow:0 16px 36px #116a5c10}
+.gl-workspace .gl-access{background:#fbfcfe}
+.gl-section-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.gl-section-label{color:#6b7e90;font-size:12px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
+.gl-access .small{line-height:1.55}
+.gl-audit #auditButton{width:100%;margin-top:15px}
+.gl-divider{border:0;border-top:1px solid var(--gl-border);margin:16px 0}
+@media(max-width:760px){header{padding:13px 16px}main{padding:26px 14px 48px}.gl-workspace{grid-template-columns:1fr}.card{padding:20px}.gl-hero .gl-subline{gap:7px}#scenarioForm{grid-template-columns:1fr 1fr}}
+@media(max-width:460px){#scenarioForm{grid-template-columns:1fr}.brand{font-size:18px}header .tag{font-size:11px;padding:5px 8px}main>h1{font-size:2.15rem}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}button{transition:none}}
+@media print{html,body,.card,.finding,.financial{background:#fff!important;color:#172b36!important;box-shadow:none!important}header{position:static}}
+
 </style>
 </head>
 <body>
 
 <header>
-  <div class="brand">GrowthLens AI</div>
-  <div class="tag">Private Beta · v0.3</div>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">↗</span>GrowthLens <span style="font-weight:500;color:#64748b">AI</span></div>
+  <div class="tag">● Private beta</div>
 </header>
 
 <main>
-  <h1>Find your website's growth opportunities.</h1>
-  <p class="muted">
-    Analyze a public webpage, identify technical SEO issues,
-    and explore verified competitor and public-data intelligence.
-  </p>
+  <div class="gl-hero">
+    <p class="gl-eyebrow">Website intelligence platform</p>
+    <h1>Turn your website into a growth advantage.</h1>
+    <p class="muted">Discover your business, uncover opportunities across usability, SEO and conversion, and get clear steps to improve your website.</p>
+    <div class="gl-subline" aria-label="Platform capabilities">
+      <span class="gl-chip">✓ Actionable website audits</span>
+      <span class="gl-chip">✓ Step-by-step recommendations</span>
+      <span class="gl-chip">✓ Revenue scenarios</span>
+    </div>
+  </div>
 
-  <section class="card">
-    <h2>Private Access</h2>
-    <label for="privateKey">Access key</label>
-    <input id="privateKey" type="password"
-      autocomplete="off" placeholder="Enter access key">
-    <p class="muted small">
-      Your key is not saved in browser storage.
-    </p>
-  </section>
-
-  <div class="grid">
-    <section class="card">
-      <h2>Website Audit</h2>
+  <div class="gl-workspace">
+    <section class="card gl-audit">
+      <div class="gl-section-head"><span class="gl-section-label">01 / Get started</span><span class="gl-section-label">Business discovery</span></div>
+      <h2>Audit a business website</h2>
+      <p class="muted small">Enter a business name or paste its website address. We'll help you select the right site before auditing.</p>
       <form id="auditForm">
         <label for="url">Business name or website URL</label>
-        <input id="url" type="text"
-          placeholder="e.g. Tamberino’s Pizza Bel Air MD or https://example.com" required>
-        <button id="auditButton" type="submit">
-          Find &amp; Audit Business
-        </button>
+        <input id="url" type="text" autocomplete="off" placeholder="Tamberinos pizza or https://example.com" required>
+        <button id="auditButton" type="submit">Find &amp; audit business →</button>
       </form>
-      <p class="muted small">
-        Checks one public HTML page. Some websites block automated audits.
-      </p>
-      <p id="status" role="status"></p>
+      <p class="muted small">Analyzes one publicly accessible page. Some sites restrict automated inspection.</p>
+      <p id="status" role="status" aria-live="polite"></p>
       <div id="businessMatches" aria-live="polite"></div>
     </section>
-
-
+    <section class="card gl-access">
+      <span class="gl-section-label">Secure workspace</span>
+      <h2>Private access</h2>
+      <p class="muted small">Your private beta access key unlocks audits, recommendations and saved history.</p>
+      <label for="privateKey">Access key</label>
+      <input id="privateKey" type="password" autocomplete="off" placeholder="Enter your access key">
+      <hr class="gl-divider">
+      <p class="muted small">Your key is not saved in browser storage.</p>
+    </section>
   </div>
 
   <section class="card hidden" id="results">
