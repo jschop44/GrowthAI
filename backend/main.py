@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 ROOT = os.path.dirname(os.path.dirname(__file__))
 DB = os.environ.get('GROWTHLENS_DB', os.path.join(ROOT, 'growthlens.db'))
 AGENT = 'GrowthLensAuditBot/0.1 (+public website audit)'
-app = FastAPI(title='GrowthLens AI Private Beta', version='1.1.0')
+app = FastAPI(title='Growth Lens Private Beta', version='1.1.0')
 AUDIT_LOCK = threading.BoundedSemaphore(2)
 
 @app.middleware('http')
@@ -546,6 +546,12 @@ def fetch_robots(client,url):
     validate_url(url)
     response=client.get(url,follow_redirects=False,headers={'User-Agent':AGENT},timeout=8)
     return response,url
+
+@app.get('/growth-lens-logo.svg', include_in_schema=False)
+def brand_logo():
+    return FileResponse(os.path.join(ROOT,'frontend','growth-lens-logo.svg'),
+                        media_type='image/svg+xml',
+                        headers={'Cache-Control':'public, max-age=3600'})
 
 @app.get('/')
 def homepage():
