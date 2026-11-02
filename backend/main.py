@@ -527,20 +527,74 @@ def analyze_html(html, url, elapsed_ms):
     score = sum(f['weight'] for f in findings if f['passed'])
     return {'url':url,'score':score,'max_score':100,'scoring_scope':'Single-page on-page technical checks; not an overall business growth score','findings':findings,'observations':{'title':title,'meta_description':description,'h1_count':len(h1s),'image_count':len(imgs),'images_missing_alt':missing_alt,'internal_link_count':internal_links,'structured_data_blocks':structured,'fetch_elapsed_ms':round(elapsed_ms),'heading_counts':heading_counts,'document_language':lang,'generic_link_count':generic_links,'unlabeled_inputs':unlabeled_inputs,'social_title_present':bool(og_title),'social_image_present':bool(og_image),'navigation_detected':nav,'branding_detected':logo,'contact_links_detected':contacts,'primary_action_detected':cta,'faq_detected':faq,'trust_signals_detected':trust,'site_search_detected':search},'limitations':['Only the supplied page is analyzed, not the whole site.','No search rankings, traffic, competitor revenue, brand design quality, customer retention, downtime, or AI search visibility are measured.','Fetch time is not a Lighthouse or Core Web Vitals score. UX checks detect HTML signals, not actual ease of use. Financial estimates are illustrative assumptions, not measured returns.']}
 
-def robots_allowed(client,url):
+def robots_decision(client,url):
+    """Return (state, explanation): allowed, disallowed or unverified."""
     parsed=urlparse(url)
     robots_url=f'{parsed.scheme}://{parsed.netloc}/robots.txt'
     try:
         response,_=fetch_robots(client,robots_url)
-        if response.status_code == 404:
-            return True
+        if response.status_code in (404,410):
+            return 'allowed','No robots.txt rules were published (HTTP '+str(response.status_code)+').'
+        if response.status_code in (401,403):
+            return 'unverified','robots.txt access was denied (HTTP '+str(response.status_code)+').'
         if response.status_code != 200:
-            return False
+            return 'unverified','robots.txt returned HTTP '+str(response.status_code)+'.'
         rp=RobotFileParser()
         rp.parse(response.text.splitlines())
-        return rp.can_fetch(AGENT,url)
-    except (httpx.HTTPError,ValueError):
-        return False
+        if rp.can_fetch(AGENT,url):
+            return 'allowed','robots.txt permits this page.'
+        return 'disallowed','robots.txt explicitly disallows this page for the audit user agent.'
+    except (httpx.HTTPError,ValueError) as exc:
+        return 'unverified','Could not verify robots.txt: '+str(exc)[:180]
+
+
+def robots_allowed(client,url):
+    return robots_decision(client,url)[0]=='allowed'
+
+
+def public_intelligence_fallback(url,state,reason):
+    """No site HTML is requested. Never infer on-page SEO or conversion defects."""
+    host=urlparse(url).hostname or ''
+    # validate_url already verified the host resolves only to public addresses.
+    observations={'domain':host,'https_url_supplied':urlparse(url).scheme=='https',
+                  'public_dns_resolution_verified':True,
+                  'website_html_inspected':False,'robots_state':state}
+    findings=[
+      {'id':'public_search_visibility','name':'Review public search visibility',
+       'passed':False,'weight':0,'verification':'suggestion_not_observed',
+       'recommendation':'Review search-engine indexing and your verified business listing; neither was measured by this fallback.',
+       'implementation_steps':['Search for the business name and domain in major search engines.',
+          'Claim or verify the relevant business profile using the platform’s official process.',
+          'Confirm that contact details, hours and website links are accurate.',
+          'Use Search Console or equivalent owner-authorized tools to review indexing and coverage.']},
+      {'id':'owner_authorized_audit','name':'Enable a complete owner-authorized audit',
+       'passed':False,'weight':0,'verification':'not_tested',
+       'recommendation':'Provide an authorized crawl or owner-supplied audit report for page-level SEO, accessibility, performance and conversion findings.',
+       'implementation_steps':['Confirm ownership or obtain permission from the website owner.',
+          'Review robots.txt rules and firewall access with the site administrator.',
+          'Export a Lighthouse or PageSpeed report and share it with Growth Lens for review.',
+          'Only then assess page-specific recommendations and their financial impact.']}
+    ]
+    for finding in findings:
+        finding['financial_scenario']={
+          'implementation_cost_usd':{'low':0,'high':0},
+          'annual_incremental_revenue_usd':0,
+          'annual_incremental_contribution_usd':0,
+          'annual_operating_savings_usd':0,
+          'estimated_downtime_cost_usd':0,
+          'first_year_net_contribution_usd':0,
+          'payback_months':None,'confidence':'not_estimable',
+          'note':'No page-level evidence or business financial data; revenue and savings cannot be estimated responsibly.'}
+    return {'url':url,'status':'partial','audit_mode':'public_intelligence',
+            'score':None,'max_score':None,'scoring_scope':'Public-domain metadata only; no website crawl or technical score.',
+            'findings':findings,'observations':observations,
+            'robots_status':state,'robots_explanation':reason,
+            'limitations':['No website HTML was fetched.','Search rankings, traffic, retention, accessibility and site performance were not measured.',
+                           'Financial impact is not estimable without evidence.'],
+            'public_tools':[
+              {'name':'Google PageSpeed Insights','url':'https://pagespeed.web.dev/'},
+              {'name':'Google Search Console','url':'https://search.google.com/search-console/about'}]}
+
 
 def fetch_robots(client,url):
     validate_url(url)
@@ -574,8 +628,13 @@ def create_audit(body: AuditRequest):
         audit_id=cursor.lastrowid
     try:
         with httpx.Client(trust_env=False) as client:
-            if not robots_allowed(client,url):
-                raise ValueError('Website robots.txt does not permit this audit, or could not be checked.')
+            robots_state,robots_reason=robots_decision(client,url)
+            if robots_state!='allowed':
+                result=public_intelligence_fallback(url,robots_state,robots_reason)
+                with database() as conn:
+                    conn.execute('UPDATE audits SET status=?,score=?,result_json=? WHERE id=?',
+                                 ('partial',None,json.dumps(result),audit_id))
+                return {'id':audit_id,**result}
             start=time.monotonic()
             response,final_url=fetch_public(client,url)
             elapsed=(time.monotonic()-start)*1000
