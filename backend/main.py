@@ -93,12 +93,28 @@ def _business_candidates(query, client):
     """Discover websites from independent public directory/search listings."""
     candidates=[]
     seen=set()
+    # Require the distinctive business name to appear in the listing title,
+    # address, or destination domain. Search providers can return unrelated
+    # account/login and support pages when challenged or rate-limited.
+    stop={'the','and','llc','inc','company','business','md','usa','pizza',
+          'restaurant','cafe','shop','store','near','me','official','website'}
+    query_tokens=[t for t in re.findall(r'[a-z0-9]+',query.lower()) if t not in stop and len(t)>2]
+    if not query_tokens:
+        query_tokens=[t for t in re.findall(r'[a-z0-9]+',query.lower()) if len(t)>2]
+    def relevant(name,address,url):
+        host=(urlparse(url).hostname or '').lower()
+        haystack=re.sub(r'[^a-z0-9]+',' ',str(name)+' '+str(address)+' '+host).lower()
+        words=set(haystack.split())
+        compact=re.sub(r'[^a-z0-9]','',haystack)
+        return bool(query_tokens) and any(t in words or t in compact for t in query_tokens)
     def add(name,address,website,source):
         if not website or not isinstance(website,str):
             return
         try:
             url=_candidate_url(website)
         except (ValueError,TypeError):
+            return
+        if not relevant(name,address,url):
             return
         host=urlparse(url).hostname.lower().removeprefix('www.')
         if host in seen:
