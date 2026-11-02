@@ -42,3 +42,21 @@ def test_zero_baseline_is_safe():
         gross_margin_percent=0,conversion_lift_percent=0))
     assert result["annual_incremental_revenue_usd"]==0
     assert result["payback_months"] is None
+
+def test_business_lookup_bing_fallback_no_unbound_elementtree(monkeypatch):
+    """Bing RSS must be parsed even when earlier providers have no results."""
+    from backend import main
+    class Response:
+        status_code=200
+        text='<rss><channel><item><title>Tamberinos Pizza</title><link>https://tamberinospizza.example/</link></item></channel></rss>'
+        def raise_for_status(self): pass
+        def json(self): return []
+    class Client:
+        def get(self,url,**kwargs):
+            if 'bing.com' in url: return Response()
+            if 'nominatim' in url: return Response()
+            raise main.httpx.HTTPError('Search blocked')
+    monkeypatch.setattr(main,'validate_url',lambda url:url)
+    result=main._business_candidates('Tamberinos pizza',Client())
+    assert result
+    assert result[0]['website']=='https://tamberinospizza.example/'
