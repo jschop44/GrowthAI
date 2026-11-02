@@ -60,3 +60,33 @@ def test_business_lookup_bing_fallback_no_unbound_elementtree(monkeypatch):
     result=main._business_candidates('Tamberinos pizza',Client())
     assert result
     assert result[0]['website']=='https://tamberinospizza.example/'
+
+
+def test_tamberinos_name_lookup_extracts_real_site_from_duckduckgo(monkeypatch):
+    """No city, apostrophe, or DNS availability is needed for discovery."""
+    from backend import main
+    from urllib.parse import quote
+    class Response:
+        status_code=200
+        def __init__(self,text='',items=None):
+            self.text=text
+            self.items=items
+        def raise_for_status(self): pass
+        def json(self): return self.items or []
+    class Client:
+        def get(self,url,**kwargs):
+            if 'nominatim' in url:
+                return Response(items=[])
+            if 'duckduckgo.com' in url:
+                return Response('<a class="result__a" href="//duckduckgo.com/l/?uddg='+
+                    quote('https://www.tamberinos.online/')+
+                    '">Tamberino\'s Pizza &amp; Subs — Official Site</a>')
+            if 'google.com' in url:
+                raise main.httpx.HTTPError('Google unavailable')
+            if 'bing.com' in url:
+                return Response('<rss><channel></channel></rss>')
+            raise AssertionError(url)
+    results=main._business_candidates('Tamberinos pizza',Client())
+    assert results
+    assert results[0]['website']=='https://www.tamberinos.online/'
+    assert results[0]['source']=='DuckDuckGo search suggestion'
