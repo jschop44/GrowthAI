@@ -376,6 +376,10 @@ footer img{display:block}
 #reportHeader .kicker{color:#116a5c}
 @media(max-width:460px){header .brand{font-size:18px}.brand-logo{width:36px;height:36px}}
 @media print{header .brand{color:#142e3e!important}#reportHeader .kicker{color:#116a5c!important}}
+
+.public-fallback #summary{background:#fff9ed;border-color:#eed7a4}
+.public-fallback #summary .score{font-size:clamp(25px,4vw,38px);letter-spacing:-.04em;color:#855b1b}
+.public-fallback #aiButton{display:none}
 </style>
 </head>
 <body>
@@ -648,18 +652,31 @@ function render(data, createdAt = null) {
 
   $("results").classList.remove("hidden");
   $("extras").textContent = "";
+  const isPublicFallback=data.audit_mode==="public_intelligence";
+  $("results").classList.toggle("public-fallback",isPublicFallback);
+  $("aiButton").disabled=isPublicFallback;
+  $("aiButton").title=isPublicFallback?"Full page audit required for generated explanations":"";
+  $("speedButton").disabled=false;
+  if (isPublicFallback) {
+    $("status").textContent=data.robots_status==="disallowed"
+      ?"Website crawling is prohibited by robots.txt. Showing permitted public metadata instead."
+      :"Website crawl permissions could not be verified. Showing permitted public metadata instead.";
+  }
 
   populateReport(data);
 
   $("summary").innerHTML =
     "<div class='score'>" +
-    esc(data.score ?? "—") +
-    "/100</div>" +
+    (isPublicFallback?"Public intelligence":esc(data.score ?? "—")+"/100") +
+    "</div>" +
     "<p>" +
     esc(data.scoring_scope || "Single-page technical audit") +
     "</p><p>" +
     esc(data.url) +
-    "</p>";
+    "</p>" +
+    (isPublicFallback?"<p><strong>Access status: "+esc(data.robots_status)+
+      "</strong> — "+esc(data.robots_explanation)+"</p>"+
+      "<p>No page-level checks were performed. Recommendations are next steps, not observed defects. No revenue or savings claims are made.</p>":"");
 
   const failedFindings=(data.findings||[]).filter(f=>!f.passed);
   const passedFindings=(data.findings||[]).filter(f=>f.passed);
@@ -687,7 +704,7 @@ function render(data, createdAt = null) {
     "<h4>Checks passed ("+passedFindings.length+")</h4>"+
     passedFindings.map(renderFinding).join('');
   const opportunities=failedFindings.filter(f=>f.financial_scenario);
-  $("scenarioPanel").classList.remove("hidden");
+  $("scenarioPanel").classList.toggle("hidden",isPublicFallback);
   $("scenarioResult").innerHTML=opportunities.length
     ? "<p><strong>"+opportunities.length+" improvement opportunities modeled</strong></p>"+
       "<p>Each recommendation includes estimated implementation cost, potential added sales, potential operating savings, downtime cost and first-year net contribution. Estimates use stated assumptions; they are not additive.</p>"
