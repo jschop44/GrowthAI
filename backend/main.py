@@ -469,6 +469,45 @@ def analyze_html(html, url, elapsed_ms):
           'confidence':'illustrative_only',
           'note':'Optional feature, not a universal requirement. No actual traffic, customer retention or revenue measured. Do not sum recommendation estimates.'}
         findings.append(finding)
+    # Automated, explicitly hypothetical financial models based on observed page
+    # signals. Public HTML cannot reveal sales, retention, labor costs or traffic.
+    # Savings are *separate* from added sales; avoid double-counting.
+    efficiency_ids={'navigation','form_accessibility','contact','faq','site_search',
+                    'online_booking','lead_capture','chat_support','anchor_integrity'}
+    for finding in findings:
+        scenario=finding.get('financial_scenario')
+        if not scenario:
+            continue
+        if finding['passed']:
+            scenario['annual_operating_savings_usd']=0
+            scenario['estimated_downtime_cost_usd']=0
+            scenario['first_year_net_contribution_usd']=0
+            scenario['payback_months']=None
+            scenario['note']='Check passed; no incremental opportunity is claimed.'
+            continue
+        cost=scenario['implementation_cost_usd']
+        # Illustrative assumptions, not detected business metrics.
+        hours_saved=2 if finding['id'] in efficiency_ids else 0
+        hourly_labor=25
+        annual_savings=hours_saved*hourly_labor*12
+        downtime_hours=1 if finding['id'] in {'navigation','commerce','online_booking'} else 0
+        baseline_hourly_sales=(1000*.02*100)/730
+        downtime_loss=round(downtime_hours*baseline_hourly_sales)
+        annual_contribution=scenario['annual_incremental_contribution_usd']
+        midpoint=(cost['low']+cost['high'])/2
+        net=round(annual_contribution+annual_savings-midpoint-downtime_loss)
+        scenario.update({
+            'annual_operating_savings_usd':annual_savings,
+            'estimated_downtime_cost_usd':downtime_loss,
+            'first_year_net_contribution_usd':net,
+            'payback_months':round((midpoint+downtime_loss)/((annual_contribution+annual_savings)/12),1)
+               if annual_contribution+annual_savings>0 else None,
+            'savings_assumptions':{'staff_hours_saved_per_month':hours_saved,
+                'loaded_hourly_labor_usd':hourly_labor,
+                'implementation_downtime_hours':downtime_hours},
+            'confidence':'illustrative_only',
+            'note':'Automatic scenario using assumed 1,000 monthly visits, 2% conversion, $100 sale, 20% margin and $25/hour labor. Traffic, sales, labor, retention and downtime are not measured. Savings are hypothetical and must not be summed across recommendations.'
+        })
     score = sum(f['weight'] for f in findings if f['passed'])
     return {'url':url,'score':score,'max_score':100,'scoring_scope':'Single-page on-page technical checks; not an overall business growth score','findings':findings,'observations':{'title':title,'meta_description':description,'h1_count':len(h1s),'image_count':len(imgs),'images_missing_alt':missing_alt,'internal_link_count':internal_links,'structured_data_blocks':structured,'fetch_elapsed_ms':round(elapsed_ms),'heading_counts':heading_counts,'document_language':lang,'generic_link_count':generic_links,'unlabeled_inputs':unlabeled_inputs,'social_title_present':bool(og_title),'social_image_present':bool(og_image),'navigation_detected':nav,'branding_detected':logo,'contact_links_detected':contacts,'primary_action_detected':cta,'faq_detected':faq,'trust_signals_detected':trust,'site_search_detected':search},'limitations':['Only the supplied page is analyzed, not the whole site.','No search rankings, traffic, competitor revenue, brand design quality, customer retention, downtime, or AI search visibility are measured.','Fetch time is not a Lighthouse or Core Web Vitals score. UX checks detect HTML signals, not actual ease of use. Financial estimates are illustrative assumptions, not measured returns.']}
 
