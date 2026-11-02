@@ -393,6 +393,33 @@ footer img{display:block}
 .report-brand{display:flex;align-items:center;gap:12px;margin-bottom:16px}.report-brand img{width:58px;height:58px;object-fit:contain}.report-wordmark{font-size:24px;font-weight:800;color:#142e3e;letter-spacing:-.05em}.report-wordmark span{color:#168260}
 .report-client{display:flex;align-items:center;gap:10px;margin:12px 0}.report-client-monogram{display:grid;place-items:center;width:40px;height:40px;border-radius:9px;background:#e8f4ef;color:#116a5c;font-weight:800}.report-client-label{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.09em}.report-client strong{font-size:17px;color:#142e3e}
 @media print{.recommendation-details:not([open])>.recommendation-body{display:block!important}.recommendation-details>summary:after{display:none}.steps-details:not([open])>ol,.steps-details:not([open])>p{display:block!important}.report-brand,.report-client{break-inside:avoid}.report-brand img{width:58px;height:58px}}
+
+/* Compact client-facing print report. Hide the entire application shell and its private access form. */
+@media print{
+  @page{size:letter;margin:0.62in 0.58in 0.65in}
+  body{background:#fff!important;font:9pt/1.32 Arial,sans-serif!important}
+  body>*:not(main){display:none!important}
+  main>*:not(#results){display:none!important}
+  main{display:block!important;padding:0!important;margin:0!important;max-width:none!important}
+  #results{display:block!important;position:static!important;width:100%!important;padding:0!important;margin:0!important;box-shadow:none!important;border:0!important}
+  #results>*:not(#reportHeader):not(#reportExecutive):not(#reportPriorities):not(#reportFooter){display:none!important}
+  #reportHeader,#reportExecutive,#reportPriorities,#reportFooter{display:block!important}
+  #reportHeader{padding:0 0 9px!important;margin:0 0 12px!important}
+  #reportHeader h1{font-size:17pt!important;margin:7px 0!important}
+  #reportExecutive{padding:10px 13px!important;margin:8px 0 12px!important}
+  #reportExecutive h3,#reportPriorities h3{font-size:12pt!important;margin:0 0 6px!important}
+  #reportExecutive p{margin:4px 0!important}
+  #reportPriorities{margin:10px 0!important;break-inside:auto!important}
+  #reportPriorityList{display:block!important;padding:0!important;margin:0!important}
+  .report-action{display:block;break-inside:avoid;page-break-inside:avoid;padding:9px 0!important;border-bottom:1px solid #dce5e8}
+  .report-action-title{font-size:10pt;font-weight:800;color:#116a5c}
+  .report-action p{margin:3px 0!important;line-height:1.3!important}
+  #reportFooter{font-size:7pt!important;margin:12px 0 0!important;padding-top:7px!important}
+  .report-brand{margin-bottom:8px!important}.report-brand img{width:42px!important;height:42px!important}
+  .report-client{margin:6px 0!important}
+  .report-business-logo{width:40px;height:40px;object-fit:contain}
+  body:before{content:"";position:fixed;top:-0.37in;left:0;right:0;height:2px;background:#087f70}
+}
 </style>
 </head>
 <body>
@@ -443,7 +470,7 @@ footer img{display:block}
 
     <div id="reportHeader" class="report-only">
       <div class="report-brand"><img src="/growth-lens-logo.svg" width="58" height="58" alt="Growth Lens logo"><div><div class="report-wordmark">Growth <span>Lens</span></div><div class="kicker">CLIENT WEBSITE INTELLIGENCE REPORT</div></div></div>
-      <div class="report-client"><div class="report-client-monogram" id="reportCompanyLogo" aria-hidden="true">CO</div><div><div class="report-client-label">Prepared for</div><strong id="reportCompanyName">Company</strong></div></div>
+      <div class="report-client"><div class="report-client-monogram" id="reportCompanyLogo" aria-hidden="true">CO</div><img id="reportBusinessLogo" alt="Business logo" class="report-business-logo" hidden><div><div class="report-client-label">Prepared for</div><strong id="reportCompanyName">Company</strong></div></div>
       <h1 id="reportCompany">Website Audit</h1>
       <div class="report-meta">
         <span id="reportWebsite"></span>
@@ -459,7 +486,7 @@ footer img{display:block}
 
     <section id="reportPriorities" class="report-only">
       <h3>Prioritized Recommendations</h3>
-      <ol id="reportPriorityList"></ol>
+      <div id="reportPriorityList"></div>
     </section>
 
     <h2>Audit Results</h2>
@@ -614,6 +641,7 @@ function populateReport(data) {
   $("reportCompany").textContent =
     company + " | Website Audit";
   $("reportCompanyLogo").textContent = company.slice(0,2).toUpperCase();
+  $("reportBusinessLogo").hidden = true;
   $("reportCompanyName").textContent = company;
 
   $("reportWebsite").textContent =
@@ -622,40 +650,28 @@ function populateReport(data) {
   $("reportDate").textContent =
     "Audit date: " + reportDate(activeAuditDate);
 
-  $("reportExecutiveText").textContent =
-    "This automated review scored " +
-    (data.score ?? "—") +
-    "/100 on the technical checklist. " +
-    passed + " of " + findings.length +
-    " checks passed. " +
-    (
-      failed.length
-        ? "The highest-weight failed check is " +
-          failed[0].name.toLowerCase() +
-          ". The prioritized actions below address observed " +
-          "technical gaps; resulting business improvements " +
-          "are not measured or guaranteed."
-        : "All evaluated checks passed. This does not establish " +
-          "rankings, site-wide SEO health, or business performance."
-    );
-
-  $("reportScope").textContent =
-    "Scope: one publicly accessible HTML page. " +
-    "No competitor, search ranking, traffic, social, " +
-    "conversion, or actual revenue data was measured.";
-
-  $("reportPriorityList").innerHTML = failed.length
-    ? failed.map((f, i) =>
-        "<li><strong>Priority " + (i + 1) + ": " +
-        esc(f.name) + "</strong> — " +
-        esc(f.recommendation) +
-        "<ol>" + (f.implementation_steps||[]).map(step=>"<li>"+esc(step)+"</li>").join("") + "</ol>" +
-        " <span style='color:#647580'>(" +
-        esc(f.weight) +
-        "-point check)</span></li>"
-      ).join("")
-    : "<li>Maintain existing technical practices and " +
-      "consider a broader site-wide audit.</li>";
+  const fallback=data.audit_mode==="public_intelligence";
+  $("reportExecutiveText").textContent = fallback
+    ? "Public intelligence review only. Website content was not inspected, so page-level performance and conversion findings cannot be verified."
+    : "Technical audit: "+(data.score??"Not scored")+"/100. "+passed+" of "+findings.length+" checks passed. Recommendations below are prioritized by audit weight.";
+  $("reportScope").textContent = fallback
+    ? "Scope: domain metadata and available independent public sources. No page crawl or validated revenue forecast."
+    : "Scope: one publicly accessible page. Cost and revenue figures are illustrative assumptions, not observed business results.";
+  const top=failed.slice(0,5);
+  $("reportPriorityList").innerHTML = top.length ? top.map((f,i)=>{
+    const finance=f.financial_scenario;
+    const estimable=finance&&finance.confidence!=="not_estimable";
+    const cost=estimable?"Estimated implementation: "+money(finance.implementation_cost_usd?.low??0)+"–"+money(finance.implementation_cost_usd?.high??0):"Implementation cost: not established";
+    const impact=estimable?"Illustrative annual sales upside: "+money(finance.annual_incremental_revenue_usd??0)+"; operating savings: "+money(finance.annual_operating_savings_usd??0)+"; first-year net: "+money(finance.first_year_net_contribution_usd??0):"Financial impact: cannot be estimated from available evidence";
+    const why=f.verification==="suggestion_not_observed"?"Opportunity to investigate; not an observed website defect.":(f.recommendation||"Improvement recommended by the audit.");
+    return "<li class='report-action'><div class='report-action-title'>"+(i+1)+". "+esc(f.name)+"</div>"+
+      "<p><strong>What to do:</strong> "+esc(f.recommendation||f.name)+"</p>"+
+      "<p><strong>Why:</strong> "+esc(why)+"</p>"+
+      "<p><strong>Cost:</strong> "+esc(cost)+"</p>"+
+      "<p><strong>Potential impact:</strong> "+esc(impact)+"</p>"+
+      ((f.implementation_steps||[]).length?"<p><strong>First step:</strong> "+esc(f.implementation_steps[0])+"</p>":"")+
+      "</li>";
+  }).join(""):"<li>No failed technical checks identified in the available audit scope.</li>";
 }
 
 function render(data, createdAt = null) {
