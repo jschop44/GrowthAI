@@ -463,6 +463,22 @@ footer img{display:block}
       <input id="privateKey" type="password" autocomplete="off" placeholder="Enter your access key">
       <button id="feedbackReadinessButton" type="button">Check LeadFlow connection</button>
       <p id="feedbackReadinessStatus" class="muted small" role="status" aria-live="polite">Checks shared feedback authorization and durable storage without writing data.</p>
+      <details class="gl-feedback-form">
+        <summary>Report a real business outcome</summary>
+        <p class="muted small">Only submit an outcome you personally observed. Reports are unverified and do not prove causation.</p>
+        <form id="outcomeForm">
+          <label for="outcomeWebsite">Business website</label>
+          <input id="outcomeWebsite" type="url" required placeholder="https://business.example">
+          <label for="outcomeRecommendation">Recommendation identifier</label>
+          <input id="outcomeRecommendation" type="text" required maxlength="100" placeholder="e.g. improve-contact-form">
+          <label for="outcomeImproved">Observed outcome</label>
+          <select id="outcomeImproved"><option value="true">Improved</option><option value="false">Did not improve</option></select>
+          <label for="outcomeNotes">Notes (optional)</label>
+          <textarea id="outcomeNotes" maxlength="500" rows="2"></textarea>
+          <button type="submit">Save genuine outcome</button>
+        </form>
+        <p id="outcomeStatus" class="muted small" role="status" aria-live="polite"></p>
+      </details>
       <hr class="gl-divider">
       <p class="muted small">Your key is not saved in browser storage.</p>
     </section>
@@ -603,6 +619,28 @@ async function api(path, options = {}) {
 
   return data;
 }
+
+$("outcomeForm").onsubmit = async event => {
+  event.preventDefault();
+  const status=$("outcomeStatus");
+  status.textContent="Saving reported outcome...";
+  try {
+    const result=await api("/api/intelligence/feedback",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        website:$("outcomeWebsite").value.trim(),
+        recommendation_id:$("outcomeRecommendation").value.trim(),
+        improved:$("outcomeImproved").value==="true",
+        source:"owner_submitted_observation",
+        notes:$("outcomeNotes").value.trim()
+      })
+    });
+    const sync=result.feedback_sync||{};
+    status.textContent=result.accepted
+      ? "Outcome saved ("+(result.persistent?"durable":"non-durable")+"). LeadFlow sync: "+(sync.accepted||0)+" accepted, "+(sync.rejected||0)+" rejected, "+(sync.unavailable||0)+" unavailable."
+      : "Outcome was not saved.";
+  } catch(err){status.textContent="Could not save outcome: "+err.message;}
+};
 
 $("feedbackReadinessButton").onclick = async () => {
   const button = $("feedbackReadinessButton");
