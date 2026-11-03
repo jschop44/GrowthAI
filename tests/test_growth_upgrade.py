@@ -238,3 +238,26 @@ def test_feedback_readiness_requires_owner_key_and_probes_shared_token(monkeypat
     result=client.get('/api/intelligence/leadflow-feedback-readiness',headers={'X-GrowthLens-Key':'readiness-owner-test-key'})
     assert result.status_code==200
     assert result.json()=={'authorized':True,'persistent_catalog':True,'reason':'ready'}
+
+
+def test_feedback_readiness_reports_denial_and_outage_without_secrets(monkeypatch):
+    from backend import main
+    monkeypatch.setenv('LEADFLOW_API_TOKEN','secret-that-must-not-be-returned')
+    class DeniedResponse:
+        status_code=403
+    class DeniedClient:
+        def __init__(self,**kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self,*args): return False
+        def post(self,*args,**kwargs): return DeniedResponse()
+    monkeypatch.setattr(main.httpx,'Client',DeniedClient)
+    denied=main.leadflow_feedback_readiness()
+    assert denied=={'authorized':False,'persistent_catalog':False,'reason':'shared_feedback_access_denied'}
+    assert 'secret-that-must-not-be-returned' not in str(denied)
+    class UnavailableClient(DeniedClient):
+        def post(self,*args,**kwargs):
+            raise main.httpx.ConnectError('upstream unavailable')
+    monkeypatch.setattr(main.httpx,'Client',UnavailableClient)
+    assert main.leadflow_feedback_readiness()=={'authorized':False,'persistent_catalog':False,'reason':'leadflow_unavailable'}
+    monkeypatch.delenv('LEADFLOW_API_TOKEN')
+    assert main.leadflow_feedback_readiness()=={'authorized':False,'persistent_catalog':False,'reason':'integration_not_configured'}
