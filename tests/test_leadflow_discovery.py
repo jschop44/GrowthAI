@@ -112,3 +112,16 @@ def test_feedback_sync_sends_only_reported_outcomes_and_private_token():
     assert requests[0].headers['x-leadflow-token']=='test-secret'
     assert requests[0].url.path=='/intelligence'
     assert requests[0].read()==b'{"action":"feedback-sync","domain":"example.com","positive":3,"negative":1}'
+
+def test_feedback_sync_reports_acknowledged_and_rejected_writes():
+    from backend.main import _sync_leadflow_feedback
+    import json
+    def handler(request):
+        payload=json.loads(request.content)
+        return httpx.Response(200,json={'accepted':payload['domain']=='accepted.example'})
+    original=httpx.Client
+    with patch('backend.main.httpx.Client',side_effect=lambda *a,**kw:original(transport=httpx.MockTransport(handler),**kw)):
+        result=_sync_leadflow_feedback('https://leadflow-research-api.onrender.com','secret',[
+            {'domain':'accepted.example','feedback':{'reported_positive':1,'reported_negative':0}},
+            {'domain':'rejected.example','feedback':{'reported_positive':0,'reported_negative':1}}])
+    assert result=={'attempted':2,'accepted':1,'rejected':1,'unavailable':0}
