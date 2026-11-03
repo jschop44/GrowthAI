@@ -879,6 +879,25 @@ def leadflow_discovery(body: LeadFlowDiscoveryRequest):
         raise HTTPException(503, 'LeadFlow intelligence temporarily unavailable') from exc
 
 
+@app.get('/api/intelligence/integration-status')
+def intelligence_integration_status():
+    """Private diagnostic; never return token values or raw upstream responses."""
+    configured = bool(os.environ.get('LEADFLOW_API_TOKEN'))
+    if not configured:
+        return {'configured': False, 'reachable': False,
+                'reason': 'LeadFlow integration credential not configured'}
+    try:
+        result = leadflow_discovery(LeadFlowDiscoveryRequest(query='', limit=1))
+        return {'configured': True, 'reachable': True,
+                'source': result['source'], 'sample_count': len(result['leads']),
+                'checked_at': datetime.now(timezone.utc).isoformat()}
+    except HTTPException as exc:
+        return {'configured': True, 'reachable': False,
+                'reason': 'upstream_auth_or_connection_failure',
+                'upstream_status': exc.status_code,
+                'checked_at': datetime.now(timezone.utc).isoformat()}
+
+
 class IntelligenceBatchRequest(BaseModel):
     query: str = Field(default='', max_length=180)
     limit: int = Field(default=3, ge=1, le=3)
