@@ -964,14 +964,15 @@ def verify_memory_on_startup():
             before=shared_opportunity_score(request)['ranking'][0]
             prior=before['outcome_observations']
             # A stable synthetic outcome is written only once; subsequent deploys test recovery.
-            if prior==0:
-                saved=learning_engine.store(subject,'recommendation_outcome',{
-                    'source':subject,'recommendation_id':'contact','metric':'synthetic_test',
-                    'baseline':0,'observed':1,'direction':'increase','improved':True,
-                    'note':'Synthetic persistence diagnostic, never a real business outcome'},verified=False)
-                if not saved.get('persistent'):
-                    logger.error('learning_cycle_test status=failed reason=durable_write_unavailable')
-                    return
+            if prior<5:
+                for index in range(prior,5):
+                    saved=learning_engine.store(subject,'recommendation_outcome',{
+                        'source':subject,'recommendation_id':'contact','metric':'synthetic_test_'+str(index),
+                        'baseline':0,'observed':index+1,'direction':'increase','improved':True,
+                        'note':'Synthetic persistence diagnostic, never a real business outcome'},verified=False)
+                    if not saved.get('persistent'):
+                        logger.error('learning_cycle_test status=failed reason=durable_write_unavailable')
+                        return
             after=shared_opportunity_score(request)['ranking'][0]
             recovered=after['outcome_observations']>0
             changed=after['learning_adjustment']>0
