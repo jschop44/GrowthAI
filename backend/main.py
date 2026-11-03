@@ -35,7 +35,10 @@ async def private_access(request: Request, call_next):
     if request.url.path.startswith('/api/') and request.url.path not in ('/api/health',):
         expected = os.environ.get('GROWTHLENS_PRIVATE_KEY', '')
         supplied = request.headers.get('X-GrowthLens-Key', '')
-        if not expected or not hmac.compare_digest(expected, supplied):
+        integration_key = os.environ.get('GROWTHLENS_LEADFLOW_KEY', '')
+        valid_owner = bool(expected) and hmac.compare_digest(expected, supplied)
+        valid_leadflow = request.url.path == '/api/audits' and bool(integration_key) and hmac.compare_digest(integration_key, supplied)
+        if not (valid_owner or valid_leadflow):
             return JSONResponse({'detail': 'Private access key required or invalid.'}, status_code=401)
     return await call_next(request)
 
