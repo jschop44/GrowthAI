@@ -928,6 +928,18 @@ def run_intelligence_batch(body: IntelligenceBatchRequest):
                     website=target, findings=audit.get('findings', []),
                     platform=lead.get('platform')))
                 record['opportunity'] = ranking
+                top = (ranking.get('ranking') or [])[:3]
+                record['outreach_brief'] = {
+                    'business': record['name'], 'website': target,
+                    'observed_opportunities': [
+                        {'finding': item.get('finding'), 'finding_id': item.get('finding_id'),
+                         'reason': item.get('reason'), 'evidence_type': item.get('evidence_type')}
+                        for item in top],
+                    'suggested_angle': ('Offer to discuss improving ' + str(top[0].get('finding', 'the website'))
+                                        if top else 'No observed website improvement opportunity established'),
+                    'human_review_required': True, 'sending_enabled': False,
+                    'revenue_claims_allowed': False
+                }
         except Exception as exc:
             record['audit_status'] = 'unavailable'
             record['audit_error'] = type(exc).__name__
