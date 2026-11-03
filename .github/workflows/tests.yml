@@ -41,6 +41,11 @@ jobs:
                       print(json.dumps({'service':name,'health':data.get('status'),'sharedIntelligence':data.get('sharedIntelligence'),'storage':data.get('onlineCatalog',{}).get('storage')}))
                   else:
                       print(json.dumps({'service':name,'health':data.get('status'),'fields':sorted(data.keys())}))
+              except urllib.error.HTTPError as error:
+                  if name=='Shared feedback readiness' and error.code==401:
+                      print(json.dumps({'service':name,'access':'owner_auth_required','verified':False}))
+                  else:
+                      print(json.dumps({'service':name,'http_status':error.code,'verified':False}))
               except Exception as error:
-                  print(json.dumps({'service':name,'error':str(error)}))
+                  print(json.dumps({'service':name,'error':str(error),'verified':False}))
           PY
