@@ -938,6 +938,38 @@ def run_intelligence_batch(body: IntelligenceBatchRequest):
             'count': len(results), 'generated_at': datetime.now(timezone.utc).isoformat()}
 
 
+class IntelligenceEconomicsRequest(BaseModel):
+    monthly_visits: float = Field(ge=0, le=100000000)
+    conversion_rate_percent: float = Field(ge=0, le=100)
+    average_order_value: float = Field(ge=0, le=1000000)
+    gross_margin_percent: float = Field(default=40, ge=0, le=100)
+    conversion_lift_percent: float = Field(ge=0, le=100)
+    one_time_cost: float = Field(ge=0, le=10000000)
+    monthly_recurring_cost: float = Field(default=0, ge=0, le=1000000)
+
+@app.post('/api/intelligence/economics')
+def intelligence_economics(body: IntelligenceEconomicsRequest):
+    """Transparent what-if scenario using caller-supplied assumptions only."""
+    baseline = body.monthly_visits * body.conversion_rate_percent / 100 * body.average_order_value * 12
+    incremental = baseline * body.conversion_lift_percent / 100
+    annual_gross_profit = incremental * body.gross_margin_percent / 100
+    year_one_cost = body.one_time_cost + 12 * body.monthly_recurring_cost
+    net = annual_gross_profit - year_one_cost
+    roi = (net / year_one_cost * 100) if year_one_cost else None
+    monthly_contribution = annual_gross_profit / 12 - body.monthly_recurring_cost
+    payback = body.one_time_cost / monthly_contribution if monthly_contribution > 0 else None
+    return {'baseline_annual_revenue': round(baseline,2),
+            'incremental_annual_revenue_scenario': round(incremental,2),
+            'incremental_annual_gross_profit_scenario': round(annual_gross_profit,2),
+            'year_one_cost': round(year_one_cost,2),
+            'year_one_net_profit_scenario': round(net,2),
+            'year_one_roi_percent': round(roi,1) if roi is not None else None,
+            'payback_months': round(payback,1) if payback is not None else None,
+            'assumptions': body.model_dump(),
+            'scenario_only': True, 'measured_uplift': False,
+            'note': 'All figures depend on user-supplied assumptions; this is not a forecast or a causal estimate.'}
+
+
 class OpportunityScoreRequest(BaseModel):
     website: str = Field(min_length=4, max_length=2048)
     findings: list[dict] = Field(default_factory=list, max_length=100)
