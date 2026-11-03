@@ -211,3 +211,30 @@ def test_feedback_sync_skips_unobserved_outcomes(monkeypatch):
     leads=[{'domain':'example.com','feedback':{'reported_positive':0,'reported_negative':0}},
            {'domain':'other.example','feedback':{'reported_positive':26,'reported_negative':0}}]
     assert main._sync_leadflow_feedback('http://localhost:18080','test-token',leads)=={'attempted':0,'accepted':0,'rejected':0,'unavailable':0}
+
+
+def test_feedback_readiness_requires_owner_key_and_probes_shared_token(monkeypatch):
+    from backend import main
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv('GROWTHLENS_PRIVATE_KEY','readiness-owner-test-key')
+    monkeypatch.setenv('LEADFLOW_API_TOKEN','readiness-shared-test-token')
+    class Response:
+        status_code=200
+        def json(self):
+            return {'authorized':True,'feedbackWriteAccess':True,'persistentCatalog':True}
+    class Client:
+        def __init__(self,**kwargs):
+            assert kwargs['follow_redirects'] is False
+        def __enter__(self): return self
+        def __exit__(self,*args): return False
+        def post(self,url,**kwargs):
+            assert url.endswith('/intelligence')
+            assert kwargs['headers']['x-leadflow-token']=='readiness-shared-test-token'
+            assert kwargs['json']=={'action':'feedback-probe'}
+            return Response()
+    monkeypatch.setattr(main.httpx,'Client',Client)
+    client=TestClient(main.app)
+    assert client.get('/api/intelligence/leadflow-feedback-readiness').status_code==401
+    result=client.get('/api/intelligence/leadflow-feedback-readiness',headers={'X-GrowthLens-Key':'readiness-owner-test-key'})
+    assert result.status_code==200
+    assert result.json()=={'authorized':True,'persistent_catalog':True,'reason':'ready'}
