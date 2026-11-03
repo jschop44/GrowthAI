@@ -890,18 +890,31 @@ def _leadflow_feedback_summary(leads):
     return sorted(enriched,key=lambda item:(-item.get('feedback_priority_score',item.get('score',0)) if isinstance(item.get('feedback_priority_score',item.get('score',0)),(int,float)) else 0,str(item.get('domain',''))))
 
 def _sync_leadflow_feedback(base,token,leads):
-    """Best-effort, bounded feedback exchange; never blocks discovery."""
+    """Return acknowledgement telemetry without treating a request as a successful write."""
+    summary={'attempted':0,'accepted':0,'rejected':0,'unavailable':0}
     try:
         with httpx.Client(timeout=6.0,follow_redirects=False) as client:
             for lead in leads[:10]:
                 feedback=lead.get('feedback') or {}
-                if not (feedback.get('reported_positive') or feedback.get('reported_negative')):
+                positive=feedback.get('reported_positive',0)
+                negative=feedback.get('reported_negative',0)
+                if not (isinstance(positive,int) and isinstance(negative,int) and
+                        0<=positive and 0<=negative and 0<positive+negative<=25):
                     continue
-                client.post(base+'/intelligence',headers={'x-leadflow-token':token},json={
-                    'action':'feedback-sync','domain':lead.get('domain'),
-                    'positive':feedback['reported_positive'],'negative':feedback['reported_negative']})
+                summary['attempted']+=1
+                try:
+                    response=client.post(base+'/intelligence',headers={'x-leadflow-token':token},json={
+                        'action':'feedback-sync','domain':lead.get('domain'),
+                        'positive':positive,'negative':negative})
+                    if response.status_code==200 and response.json().get('accepted') is True:
+                        summary['accepted']+=1
+                    else:
+                        summary['rejected']+=1
+                except (httpx.HTTPError,ValueError):
+                    summary['unavailable']+=1
     except httpx.HTTPError:
-        pass
+        summary['unavailable']+=1
+    return summary
 
 @app.post('/api/intelligence/leadflow-discovery')
 def leadflow_discovery(body: LeadFlowDiscoveryRequest):
@@ -922,9 +935,9 @@ def leadflow_discovery(body: LeadFlowDiscoveryRequest):
         response.raise_for_status()
         result = response.json()
         enriched = _leadflow_feedback_summary(result.get('leads', []))
-        _sync_leadflow_feedback(base, token, enriched)
+        feedback_sync = _sync_leadflow_feedback(base, token, enriched)
         return {'source': 'LeadFlow', 'model': result.get('model', 'evidence_ranker'),
-                'query': body.query, 'leads': enriched,
+                'query': body.query, 'leads': enriched, 'feedback_sync': feedback_sync,
                 'refresh_queue': result.get('refreshQueue', {}),
                 'catalog_size': result.get('catalogSize'),
                 'integration': 'server_to_server', 'verified_at': datetime.now(timezone.utc).isoformat()}
