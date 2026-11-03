@@ -916,6 +916,28 @@ def _sync_leadflow_feedback(base,token,leads):
         summary['unavailable']+=1
     return summary
 
+@app.get('/api/intelligence/leadflow-feedback-readiness')
+def leadflow_feedback_readiness():
+    """Verify shared feedback authorization without writing synthetic outcomes or exposing secrets."""
+    base = os.environ.get('LEADFLOW_API_ORIGIN', 'https://leadflow-research-api.onrender.com').rstrip('/')
+    token = os.environ.get('LEADFLOW_API_TOKEN', '')
+    if base != 'https://leadflow-research-api.onrender.com' and not base.startswith('http://localhost:'):
+        raise HTTPException(503, 'Unapproved LeadFlow API origin')
+    if not token:
+        return {'authorized': False, 'persistent_catalog': False, 'reason': 'integration_not_configured'}
+    try:
+        with httpx.Client(timeout=5.0, follow_redirects=False) as client:
+            response = client.post(base + '/intelligence',
+                headers={'x-leadflow-token': token}, json={'action': 'feedback-probe'})
+        if response.status_code != 200:
+            return {'authorized': False, 'persistent_catalog': False, 'reason': 'shared_feedback_access_denied'}
+        result = response.json()
+        return {'authorized': result.get('feedbackWriteAccess') is True,
+                'persistent_catalog': result.get('persistentCatalog') is True,
+                'reason': 'ready' if result.get('feedbackWriteAccess') is True and result.get('persistentCatalog') is True else 'not_ready'}
+    except (httpx.HTTPError, ValueError):
+        return {'authorized': False, 'persistent_catalog': False, 'reason': 'leadflow_unavailable'}
+
 @app.post('/api/intelligence/leadflow-discovery')
 def leadflow_discovery(body: LeadFlowDiscoveryRequest):
     """Read evidence-ranked LeadFlow candidates using server-side credentials only."""
