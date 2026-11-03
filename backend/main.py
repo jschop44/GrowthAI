@@ -852,6 +852,40 @@ class LeadFlowDiscoveryRequest(BaseModel):
     query: str = Field(default='', max_length=180)
     limit: int = Field(default=25, ge=1, le=100)
 
+def _leadflow_feedback_summary(leads):
+    """Attach bounded per-domain outcome signals without altering evidence scores."""
+    from backend import learning_engine
+    enriched=[]
+    for lead in leads[:100]:
+        if not isinstance(lead, dict):
+            continue
+        item=dict(lead)
+        domain=str(item.get('domain') or '').lower().strip().removeprefix('www.')
+        if not re.fullmatch(r'[a-z0-9][a-z0-9.-]{0,251}[a-z0-9]',domain) or '..' in domain:
+            enriched.append(item)
+            continue
+        try:
+            observations=learning_engine.recall('https://'+domain,limit=25).get('observations',[])
+        except Exception:
+            observations=[]
+        positive=negative=0
+        for record in observations:
+            if record.get('kind')!='recommendation_outcome':
+                continue
+            data=record.get('data') or {}
+            if data.get('improved') is True:
+                positive+=1
+            elif data.get('improved') is False:
+                negative+=1
+        count=positive+negative
+        adjustment=round(8*((positive+2)/(count+4)-0.5)*min(1,count/5))
+        item['feedback']={'reported_positive':positive,'reported_negative':negative,
+                          'priority_adjustment':adjustment,'evidence_type':'user_reported_not_verified'}
+        if isinstance(item.get('score'),(int,float)) and not isinstance(item.get('score'),bool):
+            item['feedback_priority_score']=max(0,min(100,item['score']+adjustment))
+        enriched.append(item)
+    return enriched
+
 @app.post('/api/intelligence/leadflow-discovery')
 def leadflow_discovery(body: LeadFlowDiscoveryRequest):
     """Read evidence-ranked LeadFlow candidates using server-side credentials only."""
@@ -871,7 +905,7 @@ def leadflow_discovery(body: LeadFlowDiscoveryRequest):
         response.raise_for_status()
         result = response.json()
         return {'source': 'LeadFlow', 'model': result.get('model', 'evidence_ranker'),
-                'query': body.query, 'leads': result.get('leads', []),
+                'query': body.query, 'leads': _leadflow_feedback_summary(result.get('leads', [])),
                 'refresh_queue': result.get('refreshQueue', {}),
                 'catalog_size': result.get('catalogSize'),
                 'integration': 'server_to_server', 'verified_at': datetime.now(timezone.utc).isoformat()}
