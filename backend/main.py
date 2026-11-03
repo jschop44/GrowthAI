@@ -953,3 +953,33 @@ def verify_memory_on_startup():
                 'memory_self_test failed error_type=%s',type(exc).__name__)
           time.sleep(1800)
     threading.Thread(target=check,daemon=True,name='growthlens-memory-self-test').start()
+    def learning_cycle_test():
+        import logging
+        from backend import learning_engine
+        logger=logging.getLogger('growthlens.learning')
+        subject='https://learning-cycle-self-test.invalid'
+        finding={'id':'contact','name':'Contact path','passed':False}
+        request=OpportunityScoreRequest(website=subject,findings=[finding])
+        try:
+            before=shared_opportunity_score(request)['ranking'][0]
+            prior=before['outcome_observations']
+            # A stable synthetic outcome is written only once; subsequent deploys test recovery.
+            if prior==0:
+                saved=learning_engine.store(subject,'recommendation_outcome',{
+                    'source':subject,'recommendation_id':'contact','metric':'synthetic_test',
+                    'baseline':0,'observed':1,'direction':'increase','improved':True,
+                    'note':'Synthetic persistence diagnostic, never a real business outcome'},verified=False)
+                if not saved.get('persistent'):
+                    logger.error('learning_cycle_test status=failed reason=durable_write_unavailable')
+                    return
+            after=shared_opportunity_score(request)['ranking'][0]
+            recovered=after['outcome_observations']>0
+            changed=after['learning_adjustment']>0
+            logger.log(logging.INFO if recovered and changed else logging.ERROR,
+                       'learning_cycle_test status=%s phase=%s before_observations=%s after_observations=%s adjustment=%s',
+                       'passed' if recovered and changed else 'failed',
+                       'restart_recovery' if prior>0 else 'initial_write',
+                       prior,after['outcome_observations'],after['learning_adjustment'])
+        except Exception as exc:
+            logger.error('learning_cycle_test status=failed error_type=%s',type(exc).__name__)
+    threading.Thread(target=learning_cycle_test,daemon=True,name='growthlens-learning-cycle-test').start()
