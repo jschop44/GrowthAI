@@ -892,6 +892,7 @@ def _leadflow_feedback_summary(leads):
 def _sync_leadflow_feedback(base,token,leads):
     """Return acknowledgement telemetry without treating a request as a successful write."""
     summary={'attempted':0,'accepted':0,'rejected':0,'unavailable':0}
+    seen_domains=set()
     try:
         with httpx.Client(timeout=2.0,follow_redirects=False) as client:
             for lead in leads[:100]:
@@ -905,10 +906,15 @@ def _sync_leadflow_feedback(base,token,leads):
                 if not (isinstance(positive,int) and isinstance(negative,int) and
                         0<=positive and 0<=negative and 0<positive+negative<=25):
                     continue
+                domain=str(lead.get('domain') or '').lower().strip().removeprefix('www.')
+                if (not re.fullmatch(r'[a-z0-9][a-z0-9.-]{0,251}[a-z0-9]',domain)
+                        or '..' in domain or domain in seen_domains):
+                    continue
+                seen_domains.add(domain)
                 summary['attempted']+=1
                 try:
                     response=client.post(base+'/intelligence',headers={'x-leadflow-token':token},json={
-                        'action':'feedback-sync','domain':lead.get('domain'),
+                        'action':'feedback-sync','domain':domain,
                         'positive':positive,'negative':negative})
                     if response.status_code==200 and response.json().get('accepted') is True:
                         summary['accepted']+=1
