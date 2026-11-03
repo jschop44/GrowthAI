@@ -39,16 +39,16 @@ def test_rejects_nonapproved_origin(monkeypatch):
         leadflow_discovery(LeadFlowDiscoveryRequest())
     assert exc.value.status_code == 503
 
-def test_integration_status_exposes_refresh_queue_without_secrets(monkeypatch):
+def test_integration_status_reports_readiness_without_secrets(monkeypatch):
     from backend.main import intelligence_integration_status
     monkeypatch.setenv('LEADFLOW_API_TOKEN', 'private-test-token')
-    with patch('backend.main.leadflow_discovery', return_value={
-        'source':'LeadFlow', 'leads':[],
-        'refresh_queue':{'pending':7,'highPriority':3,'next':[]}}):
+    with patch('backend.main.leadflow_feedback_readiness', return_value={
+        'authorized':True,'persistent_catalog':True,'reason':'ready'}):
         result=intelligence_integration_status()
     assert result['configured'] is True
     assert result['reachable'] is True
-    assert result['refresh_queue']['pending'] == 7
+    assert result['feedback_authorized'] is True
+    assert result['persistent_catalog'] is True
     assert 'private-test-token' not in str(result)
 
 def test_leadflow_feedback_calibration_keeps_evidence_score_unchanged():
