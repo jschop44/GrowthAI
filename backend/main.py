@@ -975,22 +975,14 @@ def leadflow_discovery(body: LeadFlowDiscoveryRequest):
 
 @app.get('/api/intelligence/integration-status')
 def intelligence_integration_status():
-    """Private diagnostic; never return token values or raw upstream responses."""
-    configured = bool(os.environ.get('LEADFLOW_API_TOKEN'))
-    if not configured:
-        return {'configured': False, 'reachable': False,
-                'reason': 'LeadFlow integration credential not configured'}
-    try:
-        result = leadflow_discovery(LeadFlowDiscoveryRequest(query='', limit=1))
-        return {'configured': True, 'reachable': True,
-                'source': result['source'], 'sample_count': len(result['leads']),
-                'refresh_queue': result.get('refresh_queue', {}),
-                'checked_at': datetime.now(timezone.utc).isoformat()}
-    except HTTPException as exc:
-        return {'configured': True, 'reachable': False,
-                'reason': 'upstream_auth_or_connection_failure',
-                'upstream_status': exc.status_code,
-                'checked_at': datetime.now(timezone.utc).isoformat()}
+    """Read-only private diagnostic: never initiate discovery or synchronize outcomes."""
+    readiness=leadflow_feedback_readiness()
+    return {'configured': readiness['reason']!='integration_not_configured',
+            'reachable': readiness['reason'] not in ('integration_not_configured','leadflow_unavailable'),
+            'feedback_authorized': readiness['authorized'],
+            'persistent_catalog': readiness['persistent_catalog'],
+            'reason': readiness['reason'],
+            'checked_at': datetime.now(timezone.utc).isoformat()}
 
 
 class IntelligenceBatchRequest(BaseModel):
