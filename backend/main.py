@@ -856,6 +856,7 @@ def _leadflow_feedback_summary(leads):
     """Attach bounded per-domain outcome signals without altering evidence scores."""
     from backend import learning_engine
     enriched=[]
+    domain_cache={}
     for lead in leads[:100]:
         if not isinstance(lead, dict):
             continue
@@ -864,10 +865,12 @@ def _leadflow_feedback_summary(leads):
         if not re.fullmatch(r'[a-z0-9][a-z0-9.-]{0,251}[a-z0-9]',domain) or '..' in domain:
             enriched.append(item)
             continue
-        try:
-            observations=learning_engine.recall('https://'+domain,limit=25).get('observations',[])
-        except Exception:
-            observations=[]
+        if domain not in domain_cache:
+            try:
+                domain_cache[domain]=learning_engine.recall('https://'+domain,limit=25).get('observations',[])
+            except Exception:
+                domain_cache[domain]=[]
+        observations=domain_cache[domain]
         positive=negative=0
         for record in observations:
             if record.get('kind')!='recommendation_outcome':
