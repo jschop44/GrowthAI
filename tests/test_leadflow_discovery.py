@@ -81,3 +81,16 @@ def test_feedback_looks_up_duplicate_business_domain_only_once():
     assert recall.call_count==2
     assert result[0]['score']==80
     assert result[1]['score']==65
+
+def test_feedback_priority_orders_leads_without_rewriting_evidence():
+    from backend.main import _leadflow_feedback_summary
+    def recall(subject,limit):
+        improved=subject=='https://winner.example'
+        return {'observations':[{'kind':'recommendation_outcome','data':{'improved':improved}} for _ in range(5)]}
+    with patch('backend.learning_engine.recall',side_effect=recall):
+        leads=_leadflow_feedback_summary([
+            {'domain':'loser.example','score':80},
+            {'domain':'winner.example','score':80}])
+    assert [lead['domain'] for lead in leads]==['winner.example','loser.example']
+    assert all(lead['score']==80 for lead in leads)
+    assert leads[0]['feedback_priority_score']>leads[1]['feedback_priority_score']
