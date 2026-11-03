@@ -982,6 +982,30 @@ def intelligence_economics(body: IntelligenceEconomicsRequest):
             'note': 'All figures depend on user-supplied assumptions; this is not a forecast or a causal estimate.'}
 
 
+class IntelligenceFeedbackRequest(BaseModel):
+    website: str = Field(min_length=4, max_length=2048)
+    recommendation_id: str = Field(min_length=1, max_length=100)
+    improved: bool
+    source: str = Field(min_length=3, max_length=160)
+    notes: str = Field(default='', max_length=500)
+
+@app.post('/api/intelligence/feedback')
+def intelligence_feedback(body: IntelligenceFeedbackRequest):
+    """Store user-reported outcomes separately from verified website evidence."""
+    from backend import learning_engine
+    target = validate_url(body.website if '://' in body.website else 'https://' + body.website)
+    subject = 'https://' + urlparse(target).hostname.lower().removeprefix('www.')
+    payload = {'source': body.source, 'recommendation_id': body.recommendation_id,
+               'improved': body.improved, 'notes': body.notes,
+               'reported_at': datetime.now(timezone.utc).isoformat(),
+               'evidence_type': 'user_reported', 'causal_claim': False}
+    stored = learning_engine.store(subject, 'recommendation_outcome', payload, verified=False)
+    return {'accepted': bool(stored.get('stored')), 'persistent': bool(stored.get('persistent')),
+            'storage': stored.get('storage'), 'verification': 'user_reported_unverified',
+            'used_for': 'bounded_feedback_calibration_only',
+            'note': 'A reported outcome is not proof that a recommendation caused the change.'}
+
+
 class OpportunityScoreRequest(BaseModel):
     website: str = Field(min_length=4, max_length=2048)
     findings: list[dict] = Field(default_factory=list, max_length=100)
