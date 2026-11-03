@@ -80,7 +80,7 @@ def test_feedback_looks_up_duplicate_business_domain_only_once():
     assert len(result)==3
     assert recall.call_count==2
     assert result[0]['score']==80
-    assert result[1]['score']==65
+    assert sorted(lead['score'] for lead in result)==[65,70,80]
 
 def test_feedback_priority_orders_leads_without_rewriting_evidence():
     from backend.main import _leadflow_feedback_summary
