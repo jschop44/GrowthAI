@@ -31,11 +31,13 @@ jobs:
         run: |
           python - <<'PY'
           import json,urllib.request
-          for name,url in [('Growth Lens','https://growthlens-free-test.onrender.com/api/health'),('LeadFlow','https://leadflow-research-api.onrender.com/health')]:
+          for name,url in [('Growth Lens','https://growthlens-free-test.onrender.com/api/health'),('LeadFlow','https://leadflow-research-api.onrender.com/health'),('Shared feedback readiness','https://growthlens-free-test.onrender.com/api/intelligence/leadflow-feedback-readiness')]:
               try:
                   with urllib.request.urlopen(url,timeout=45) as response:
                       data=json.load(response)
-                  if name=='LeadFlow':
+                  if name=='Shared feedback readiness':
+                      print(json.dumps({'service':name,'authorized':data.get('authorized'),'persistent_catalog':data.get('persistent_catalog'),'reason':data.get('reason')}))
+                  elif name=='LeadFlow':
                       print(json.dumps({'service':name,'health':data.get('status'),'sharedIntelligence':data.get('sharedIntelligence'),'storage':data.get('onlineCatalog',{}).get('storage')}))
                   else:
                       print(json.dumps({'service':name,'health':data.get('status'),'fields':sorted(data.keys())}))
