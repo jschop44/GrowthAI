@@ -38,3 +38,15 @@ def test_rejects_nonapproved_origin(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         leadflow_discovery(LeadFlowDiscoveryRequest())
     assert exc.value.status_code == 503
+
+def test_integration_status_exposes_refresh_queue_without_secrets(monkeypatch):
+    from backend.main import intelligence_integration_status
+    monkeypatch.setenv('LEADFLOW_API_TOKEN', 'private-test-token')
+    with patch('backend.main.leadflow_discovery', return_value={
+        'source':'LeadFlow', 'leads':[],
+        'refresh_queue':{'pending':7,'highPriority':3,'next':[]}}):
+        result=intelligence_integration_status()
+    assert result['configured'] is True
+    assert result['reachable'] is True
+    assert result['refresh_queue']['pending'] == 7
+    assert 'private-test-token' not in str(result)
