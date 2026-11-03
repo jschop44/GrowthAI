@@ -94,3 +94,21 @@ def test_feedback_priority_orders_leads_without_rewriting_evidence():
     assert [lead['domain'] for lead in leads]==['winner.example','loser.example']
     assert all(lead['score']==80 for lead in leads)
     assert leads[0]['feedback_priority_score']>leads[1]['feedback_priority_score']
+
+def test_feedback_sync_sends_only_reported_outcomes_and_private_token():
+    from backend.main import _sync_leadflow_feedback
+    requests=[]
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200,json={'accepted':True})
+    original=httpx.Client
+    def client(*args,**kwargs):
+        return original(transport=httpx.MockTransport(handler),**kwargs)
+    with patch('backend.main.httpx.Client',side_effect=client):
+        _sync_leadflow_feedback('https://leadflow-research-api.onrender.com','test-secret',[
+            {'domain':'example.com','feedback':{'reported_positive':3,'reported_negative':1}},
+            {'domain':'other.example','feedback':{'reported_positive':0,'reported_negative':0}}])
+    assert len(requests)==1
+    assert requests[0].headers['x-leadflow-token']=='test-secret'
+    assert requests[0].url.path=='/intelligence'
+    assert requests[0].read()==b'{"action":"feedback-sync","domain":"example.com","positive":3,"negative":1}'
