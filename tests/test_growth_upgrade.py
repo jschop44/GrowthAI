@@ -283,3 +283,11 @@ def test_feedback_sync_finds_eligible_records_after_unobserved_leads(monkeypatch
     result=main._sync_leadflow_feedback('http://localhost:18080','test-token',leads)
     assert result=={'attempted':3,'accepted':3,'rejected':0,'unavailable':0}
     assert sent==['valid0.example','valid1.example','valid2.example']
+
+
+def test_integration_status_uses_readiness(monkeypatch):
+    from backend import main
+    monkeypatch.setattr(main,'leadflow_feedback_readiness',lambda:{'authorized':True,'persistent_catalog':True,'reason':'ready'})
+    result=main.intelligence_integration_status()
+    assert result['feedback_authorized'] is True
+    assert result['persistent_catalog'] is True
