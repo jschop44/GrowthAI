@@ -872,6 +872,8 @@ def leadflow_discovery(body: LeadFlowDiscoveryRequest):
         result = response.json()
         return {'source': 'LeadFlow', 'model': result.get('model', 'evidence_ranker'),
                 'query': body.query, 'leads': result.get('leads', []),
+                'refresh_queue': result.get('refreshQueue', {}),
+                'catalog_size': result.get('catalogSize'),
                 'integration': 'server_to_server', 'verified_at': datetime.now(timezone.utc).isoformat()}
     except HTTPException:
         raise
@@ -890,6 +892,7 @@ def intelligence_integration_status():
         result = leadflow_discovery(LeadFlowDiscoveryRequest(query='', limit=1))
         return {'configured': True, 'reachable': True,
                 'source': result['source'], 'sample_count': len(result['leads']),
+                'refresh_queue': result.get('refresh_queue', {}),
                 'checked_at': datetime.now(timezone.utc).isoformat()}
     except HTTPException as exc:
         return {'configured': True, 'reachable': False,
