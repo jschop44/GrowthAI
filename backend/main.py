@@ -879,6 +879,65 @@ def leadflow_discovery(body: LeadFlowDiscoveryRequest):
         raise HTTPException(503, 'LeadFlow intelligence temporarily unavailable') from exc
 
 
+class IntelligenceBatchRequest(BaseModel):
+    query: str = Field(default='', max_length=180)
+    limit: int = Field(default=3, ge=1, le=3)
+    audit: bool = True
+
+@app.post('/api/intelligence/run')
+def run_intelligence_batch(body: IntelligenceBatchRequest):
+    """Bounded on-demand discovery -> audit pipeline. No email is sent."""
+    discovered = leadflow_discovery(LeadFlowDiscoveryRequest(query=body.query, limit=body.limit))
+    results = []
+    for lead in discovered.get('leads', [])[:body.limit]:
+        website = lead.get('website') or ('https://' + lead['domain'] if lead.get('domain') else '')
+        record = {'name': str(lead.get('name', ''))[:160],
+                  'website': website, 'discovery_score': lead.get('score'),
+                  'discovery_evidence': lead.get('evidence'),
+                  'audit_status': 'not_requested'}
+        if not body.audit or not website:
+            results.append(record)
+            continue
+        try:
+            target = validate_url(website)
+            with database() as conn:
+                previous = conn.execute(
+                    'SELECT id,created_at,status,score,result_json FROM audits WHERE url=? ORDER BY id DESC LIMIT 1',
+                    (target,)).fetchone()
+            recent = False
+            if previous and previous['status'] in ('completed', 'partial'):
+                try:
+                    recent = (datetime.now(timezone.utc) - datetime.fromisoformat(previous['created_at'])).total_seconds() < 86400
+                except (TypeError, ValueError):
+                    pass
+            if recent:
+                audit = json.loads(previous['result_json']) if previous['result_json'] else {}
+                audit_id = previous['id']
+                status = previous['status']
+                record['cached'] = True
+            else:
+                audit = create_audit(AuditRequest(url=target))
+                audit_id = audit.get('id')
+                status = audit.get('status', 'completed')
+                record['cached'] = False
+            record.update({'audit_id': audit_id, 'audit_status': status,
+                           'audit_score': audit.get('score'),
+                           'findings_count': len(audit.get('findings', []))})
+            if status == 'completed':
+                ranking = shared_opportunity_score(OpportunityScoreRequest(
+                    website=target, findings=audit.get('findings', []),
+                    platform=lead.get('platform')))
+                record['opportunity'] = ranking
+        except Exception as exc:
+            record['audit_status'] = 'unavailable'
+            record['audit_error'] = type(exc).__name__
+        results.append(record)
+    return {'engine': 'Growth Lens + LeadFlow evidence pipeline v1',
+            'automated_steps': ['lead_discovery','audit_or_cache','opportunity_ranking'],
+            'outreach_sent': False, 'results': results,
+            'count': len(results), 'generated_at': datetime.now(timezone.utc).isoformat()}
+
+
 class OpportunityScoreRequest(BaseModel):
     website: str = Field(min_length=4, max_length=2048)
     findings: list[dict] = Field(default_factory=list, max_length=100)
