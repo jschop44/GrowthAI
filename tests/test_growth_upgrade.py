@@ -197,3 +197,17 @@ def test_feedback_sync_limits_network_work_and_preserves_acknowledgements(monkey
     result=main._sync_leadflow_feedback('http://localhost:18080','test-token',leads)
     assert result=={'attempted':3,'accepted':3,'rejected':0,'unavailable':0}
     assert len(requests)==3
+
+
+def test_feedback_sync_skips_unobserved_outcomes(monkeypatch):
+    from backend import main
+    class Client:
+        def __init__(self,**kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self,*args): return False
+        def post(self,*args,**kwargs):
+            raise AssertionError('Unobserved outcomes must never be transmitted as feedback')
+    monkeypatch.setattr(main.httpx,'Client',Client)
+    leads=[{'domain':'example.com','feedback':{'reported_positive':0,'reported_negative':0}},
+           {'domain':'other.example','feedback':{'reported_positive':26,'reported_negative':0}}]
+    assert main._sync_leadflow_feedback('http://localhost:18080','test-token',leads)=={'attempted':0,'accepted':0,'rejected':0,'unavailable':0}
