@@ -316,3 +316,36 @@ def test_feedback_sync_deduplicates_domains_and_ignores_invalid_targets(monkeypa
     assert result['attempted']==2
     assert result['accepted']==2
     assert sent==['example.com','other.example']
+
+
+def test_outcome_submission_immediately_syncs_persisted_feedback(monkeypatch):
+    from backend import main
+    from backend import learning_engine
+    monkeypatch.setenv('LEADFLOW_API_TOKEN','isolated-test-token')
+    monkeypatch.setenv('LEADFLOW_API_ORIGIN','http://localhost:18080')
+    monkeypatch.setattr(learning_engine,'store',lambda *a,**k:{'stored':True,'persistent':True,'storage':'test'})
+    monkeypatch.setattr(main,'_leadflow_feedback_summary',lambda leads:[{'domain':'example.com','feedback':{'reported_positive':1,'reported_negative':0}}])
+    calls=[]
+    def sync(base,token,leads):
+        calls.append((base,token,leads))
+        return {'attempted':1,'accepted':1,'rejected':0,'unavailable':0}
+    monkeypatch.setattr(main,'_sync_leadflow_feedback',sync)
+    body=main.IntelligenceFeedbackRequest(website='https://example.com',recommendation_id='seo-title',
+                                          improved=True,source='manual_user_report')
+    result=main.intelligence_feedback(body)
+    assert result['accepted'] is True
+    assert result['feedback_sync']['accepted']==1
+    assert len(calls)==1
+    assert calls[0][2][0]['domain']=='example.com'
+
+
+def test_outcome_submission_does_not_sync_unpersisted_feedback(monkeypatch):
+    from backend import main
+    from backend import learning_engine
+    monkeypatch.setenv('LEADFLOW_API_TOKEN','isolated-test-token')
+    monkeypatch.setattr(learning_engine,'store',lambda *a,**k:{'stored':True,'persistent':False,'storage':'ephemeral'})
+    monkeypatch.setattr(main,'_sync_leadflow_feedback',lambda *a,**k: (_ for _ in ()).throw(AssertionError('must not sync')))
+    body=main.IntelligenceFeedbackRequest(website='https://example.com',recommendation_id='seo-title',
+                                          improved=False,source='manual_user_report')
+    result=main.intelligence_feedback(body)
+    assert result['feedback_sync']['attempted']==0
