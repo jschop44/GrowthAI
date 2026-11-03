@@ -888,6 +888,34 @@ def shared_opportunity_score(body: OpportunityScoreRequest):
                            'reason':'Observed failed audit check; context adjustments are heuristic',
                            'evidence_type':'observed_audit_finding','confidence':'observed_failure'})
     candidates.sort(key=lambda x:(-x['priority_score'],x['finding_id']))
+    # Bounded online learning from reported outcomes for this business only.
+    # User-reported outcomes are weak evidence and never treated as causal proof.
+    try:
+        past=learning_engine.recall('https://'+domain,limit=25).get('observations',[])
+    except Exception:
+        past=[]
+    outcomes={}
+    for item in past:
+        if item.get('kind')!='recommendation_outcome':
+            continue
+        data=item.get('data') or {}
+        rid=data.get('recommendation_id')
+        if not isinstance(rid,str):
+            continue
+        stats=outcomes.setdefault(rid,{'positive':0,'negative':0})
+        key='positive' if data.get('improved') is True else 'negative'
+        stats[key]+=1
+    for candidate in candidates:
+        stats=outcomes.get(candidate['finding_id'],{'positive':0,'negative':0})
+        n=stats['positive']+stats['negative']
+        # Beta(2,2) prior; only a small adjustment until evidence accumulates.
+        posterior=(stats['positive']+2)/(n+4)
+        adjustment=round(8*(posterior-0.5)*min(1,n/5))
+        candidate['priority_score']=max(1,min(25,candidate['priority_score']+adjustment))
+        candidate['learning_adjustment']=adjustment
+        candidate['outcome_observations']=n
+        candidate['outcome_evidence']='user_reported_not_causal'
+    candidates.sort(key=lambda x:(-x['priority_score'],x['finding_id']))
     score=min(100,sum(x['priority_score'] for x in candidates[:5]))
     try:
         history=learning_engine.recall('https://'+domain,limit=15)
@@ -897,8 +925,8 @@ def shared_opportunity_score(body: OpportunityScoreRequest):
     return {'domain':domain,'score':score,'ranking':candidates[:10],
             'platform':body.platform or 'Not verified',
             'business_type':body.business_type or 'Unverified',
-            'memory':memory,'model':'shared_evidence_weighted_v2',
-            'analysis_stages':['evidence_validation','business_context_ranking','memory_retrieval'],
+            'memory':memory,'model':'shared_evidence_weighted_v3_bayesian_feedback',
+            'analysis_stages':['evidence_validation','business_context_ranking','outcome_feedback_learning','memory_retrieval'],
             'trained_neural_network':False,'predicted_revenue':None,
             'note':'Explainable heuristic ranking of observed failures. No measured conversion probability or predicted revenue.'}
 
