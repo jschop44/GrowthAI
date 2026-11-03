@@ -887,7 +887,7 @@ def _leadflow_feedback_summary(leads):
         if isinstance(item.get('score'),(int,float)) and not isinstance(item.get('score'),bool):
             item['feedback_priority_score']=max(0,min(100,item['score']+adjustment))
         enriched.append(item)
-    return enriched
+    return sorted(enriched,key=lambda item:(-item.get('feedback_priority_score',item.get('score',0)) if isinstance(item.get('feedback_priority_score',item.get('score',0)),(int,float)) else 0,str(item.get('domain',''))))
 
 @app.post('/api/intelligence/leadflow-discovery')
 def leadflow_discovery(body: LeadFlowDiscoveryRequest):
