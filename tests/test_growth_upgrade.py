@@ -176,3 +176,24 @@ def test_third_party_intelligence_handles_provider_outages():
     result=main.collect_third_party_intelligence(Client(),'https://example.com/')
     assert result['performance']['status']=='unavailable'
     assert result['business_directory']['matches']==[]
+
+
+def test_feedback_sync_limits_network_work_and_preserves_acknowledgements(monkeypatch):
+    from backend import main
+    requests=[]
+    class Response:
+        status_code=200
+        def json(self): return {'accepted':True}
+    class Client:
+        def __init__(self,**kwargs):
+            assert kwargs['timeout']==2.0
+        def __enter__(self): return self
+        def __exit__(self,*args): return False
+        def post(self,url,**kwargs):
+            requests.append(kwargs['json'])
+            return Response()
+    monkeypatch.setattr(main.httpx,'Client',Client)
+    leads=[{'domain':f'example{i}.com','feedback':{'reported_positive':1,'reported_negative':0}} for i in range(12)]
+    result=main._sync_leadflow_feedback('http://localhost:18080','test-token',leads)
+    assert result=={'attempted':3,'accepted':3,'rejected':0,'unavailable':0}
+    assert len(requests)==3
