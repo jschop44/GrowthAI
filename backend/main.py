@@ -37,7 +37,7 @@ async def private_access(request: Request, call_next):
         supplied = request.headers.get('X-GrowthLens-Key', '')
         integration_key = os.environ.get('GROWTHLENS_LEADFLOW_KEY', '')
         valid_owner = bool(expected) and hmac.compare_digest(expected, supplied)
-        valid_leadflow = request.url.path == '/api/audits' and bool(integration_key) and hmac.compare_digest(integration_key, supplied)
+        valid_leadflow = request.url.path in ('/api/audits','/api/intelligence/opportunity-score') and bool(integration_key) and hmac.compare_digest(integration_key, supplied)
         if not (valid_owner or valid_leadflow):
             return JSONResponse({'detail': 'Private access key required or invalid.'}, status_code=401)
     return await call_next(request)
@@ -845,6 +845,48 @@ register_public_intelligence(app, validate_url)
 
 from backend.intelligence_team import register_team_routes
 register_team_routes(app, validate_url, fetch_public, robots_allowed, analyze_html)
+
+# Shared, evidence-aware scoring service used by Growth Lens and LeadFlow.
+# This is deterministic ranking, not a trained neural network or a conversion prediction.
+class OpportunityScoreRequest(BaseModel):
+    website: str = Field(min_length=4, max_length=2048)
+    findings: list[dict] = Field(default_factory=list, max_length=100)
+    platform: str | None = Field(default=None, max_length=80)
+    business_type: str | None = Field(default=None, max_length=80)
+
+@app.post('/api/intelligence/opportunity-score')
+def shared_opportunity_score(body: OpportunityScoreRequest):
+    from backend import learning_engine
+    from urllib.parse import urlparse
+    target = _candidate_url(body.website if '://' in body.website else 'https://' + body.website)
+    domain = urlparse(target).hostname.lower().removeprefix('www.')
+    weights = {'contact':18,'lead_capture':17,'primary_action':16,'mobile':15,
+               'navigation':12,'trust':11,'structured_data':9,'meta_description':8,'faq':7}
+    candidates=[]
+    for finding in body.findings:
+        if finding.get('passed') is not False:
+            continue
+        fid=str(finding.get('id',''))[:100]
+        matched=next((w for key,w in weights.items() if key in fid),None)
+        if matched is None:
+            continue
+        candidates.append({'finding_id':fid,'finding':str(finding.get('name') or fid)[:150],
+                           'priority_score':matched,'reason':'Failed website audit check',
+                           'evidence_type':'observed_audit_finding'})
+    candidates.sort(key=lambda x:(-x['priority_score'],x['finding_id']))
+    score=min(100,sum(x['priority_score'] for x in candidates[:5]))
+    # Existing learning ledger provides context, not automatic model training.
+    try:
+        history=learning_engine.recall('https://'+domain,limit=15)
+        memory={'storage':history.get('storage'),'observation_count':len(history.get('observations',[]))}
+    except Exception:
+        memory={'storage':'unavailable','observation_count':0}
+    return {'domain':domain,'score':score,'ranking':candidates[:10],
+            'platform':body.platform or 'Not verified',
+            'business_type':body.business_type or 'Unverified',
+            'memory':memory,'model':'shared_evidence_weighted_v1',
+            'trained_neural_network':False,'predicted_revenue':None,
+            'note':'Priority is based on observed failed checks; not a measured conversion probability.'}
 
 from backend.intelligence_memory import register_memory_routes
 MEMORY_SELF_TEST = register_memory_routes(app)
