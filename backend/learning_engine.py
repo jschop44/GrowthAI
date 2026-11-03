@@ -140,24 +140,35 @@ def store(subject,kind,data,verified=False):
     return {"stored":neural or remote or backed_up or cached,"persistent":neural or remote or backed_up,"embedding":mode,"storage":"qdrant_neural" if neural else "qdrant" if remote else "postgres" if backed_up else "ephemeral" if cached else "unavailable","postgres_backup":backed_up,"neural_status":"active" if neural else neural_reason}
 
 def recall(subject,limit=12):
-    neural=neural_recall(subject,limit)
-    if neural:return {"storage":"qdrant_neural","observations":neural}
+    """Merge durable providers by record ID so partial Qdrant reads cannot hide Postgres history."""
+    limit=max(1,min(limit,25))
+    neural=neural_recall(subject,limit) or []
     cfg=config()
+    vector_records=[]
     if cfg:
         url,headers=cfg
         try:
             with httpx.Client(timeout=9,trust_env=False) as client:
-                r=client.post(url+"/collections/"+COLLECTION+"/points/scroll",headers=headers,json={"filter":{"must":[{"key":"subject","match":{"value":subject}}]},"limit":min(limit,25),"with_payload":True,"with_vector":False})
+                r=client.post(url+"/collections/"+COLLECTION+"/points/scroll",headers=headers,json={"filter":{"must":[{"key":"subject","match":{"value":subject}}]},"limit":limit,"with_payload":True,"with_vector":False})
                 r.raise_for_status()
-            observations=[x["payload"] for x in r.json()["result"]["points"]]
-            if observations:return {"storage":"qdrant","observations":observations}
+            vector_records=[x["payload"] for x in r.json()["result"]["points"]]
         except (httpx.HTTPError,ValueError,KeyError,TypeError):
             pass
     backup=backup_read(subject,limit)
-    if backup is not None:return {"storage":"postgres","observations":backup}
+    merged={}
+    for source in (backup or [],vector_records,neural):
+        for item in source:
+            if isinstance(item,dict) and item.get("id"):
+                merged[item["id"]]=item
+    if merged:
+        storage="qdrant_neural+postgres" if neural and backup is not None else (
+            "qdrant+postgres" if vector_records and backup is not None else (
+            "postgres" if backup is not None else "qdrant_neural" if neural else "qdrant"))
+        records=sorted(merged.values(),key=lambda x:(x.get("recorded",0),x.get("id","")),reverse=True)
+        return {"storage":storage,"observations":records[:limit]}
     try:
         with local() as db:
-            rows=db.execute("SELECT id,kind,data,recorded,verified FROM learned_observations WHERE subject=? ORDER BY recorded DESC LIMIT ?",(subject,min(limit,25))).fetchall()
+            rows=db.execute("SELECT id,kind,data,recorded,verified FROM learned_observations WHERE subject=? ORDER BY recorded DESC LIMIT ?",(subject,limit)).fetchall()
         return {"storage":"ephemeral","observations":[{"id":x[0],"subject":subject,"kind":x[1],"data":json.loads(x[2]),"recorded":x[3],"verified":bool(x[4])} for x in rows]}
     except (sqlite3.Error,ValueError):
         return {"storage":"unavailable","observations":[]}
