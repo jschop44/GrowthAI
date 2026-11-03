@@ -261,3 +261,25 @@ def test_feedback_readiness_reports_denial_and_outage_without_secrets(monkeypatc
     assert main.leadflow_feedback_readiness()=={'authorized':False,'persistent_catalog':False,'reason':'leadflow_unavailable'}
     monkeypatch.delenv('LEADFLOW_API_TOKEN')
     assert main.leadflow_feedback_readiness()=={'authorized':False,'persistent_catalog':False,'reason':'integration_not_configured'}
+
+
+def test_feedback_sync_finds_eligible_records_after_unobserved_leads(monkeypatch):
+    from backend import main
+    sent=[]
+    class Response:
+        status_code=200
+        def json(self): return {'accepted':True}
+    class Client:
+        def __init__(self,**kwargs):
+            assert kwargs['timeout']==2.0
+        def __enter__(self): return self
+        def __exit__(self,*args): return False
+        def post(self,url,**kwargs):
+            sent.append(kwargs['json']['domain'])
+            return Response()
+    monkeypatch.setattr(main.httpx,'Client',Client)
+    leads=[{'domain':f'empty{i}.example','feedback':{'reported_positive':0,'reported_negative':0}} for i in range(8)]
+    leads.extend({'domain':f'valid{i}.example','feedback':{'reported_positive':1,'reported_negative':0}} for i in range(5))
+    result=main._sync_leadflow_feedback('http://localhost:18080','test-token',leads)
+    assert result=={'attempted':3,'accepted':3,'rejected':0,'unavailable':0}
+    assert sent==['valid0.example','valid1.example','valid2.example']
