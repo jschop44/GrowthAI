@@ -894,7 +894,11 @@ def _sync_leadflow_feedback(base,token,leads):
     summary={'attempted':0,'accepted':0,'rejected':0,'unavailable':0}
     try:
         with httpx.Client(timeout=2.0,follow_redirects=False) as client:
-            for lead in leads[:3]:
+            for lead in leads[:100]:
+                if summary['attempted']>=3:
+                    break
+                if not isinstance(lead,dict):
+                    continue
                 feedback=lead.get('feedback') or {}
                 positive=feedback.get('reported_positive',0)
                 negative=feedback.get('reported_negative',0)
