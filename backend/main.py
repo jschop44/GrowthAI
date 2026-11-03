@@ -848,6 +848,37 @@ register_team_routes(app, validate_url, fetch_public, robots_allowed, analyze_ht
 
 # Shared, evidence-aware scoring service used by Growth Lens and LeadFlow.
 # This is deterministic ranking, not a trained neural network or a conversion prediction.
+class LeadFlowDiscoveryRequest(BaseModel):
+    query: str = Field(default='', max_length=180)
+    limit: int = Field(default=25, ge=1, le=100)
+
+@app.post('/api/intelligence/leadflow-discovery')
+def leadflow_discovery(body: LeadFlowDiscoveryRequest):
+    """Read evidence-ranked LeadFlow candidates using server-side credentials only."""
+    base = os.environ.get('LEADFLOW_API_ORIGIN', 'https://leadflow-research-api.onrender.com').rstrip('/')
+    token = os.environ.get('LEADFLOW_API_TOKEN', '')
+    if not token:
+        raise HTTPException(503, 'LeadFlow integration not configured; set LEADFLOW_API_TOKEN privately on Growth Lens.')
+    if base != 'https://leadflow-research-api.onrender.com' and not base.startswith('http://localhost:'):
+        raise HTTPException(503, 'Unapproved LeadFlow API origin')
+    try:
+        with httpx.Client(timeout=12.0, follow_redirects=False) as client:
+            response = client.post(base + '/intelligence',
+                                   headers={'x-api-token': token},
+                                   json={'query': body.query, 'limit': body.limit})
+        if response.status_code in (401, 403):
+            raise HTTPException(503, 'LeadFlow integration token rejected')
+        response.raise_for_status()
+        result = response.json()
+        return {'source': 'LeadFlow', 'model': result.get('model', 'evidence_ranker'),
+                'query': body.query, 'leads': result.get('leads', []),
+                'integration': 'server_to_server', 'verified_at': datetime.now(timezone.utc).isoformat()}
+    except HTTPException:
+        raise
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(503, 'LeadFlow intelligence temporarily unavailable') from exc
+
+
 class OpportunityScoreRequest(BaseModel):
     website: str = Field(min_length=4, max_length=2048)
     findings: list[dict] = Field(default_factory=list, max_length=100)
