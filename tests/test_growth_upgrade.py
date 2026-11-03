@@ -291,3 +291,28 @@ def test_integration_status_uses_readiness(monkeypatch):
     result=main.intelligence_integration_status()
     assert result['feedback_authorized'] is True
     assert result['persistent_catalog'] is True
+
+
+def test_feedback_sync_deduplicates_domains_and_ignores_invalid_targets(monkeypatch):
+    from backend import main
+    sent=[]
+    class Response:
+        status_code=200
+        def json(self): return {'accepted':True}
+    class Client:
+        def __init__(self,**kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self,*args): return False
+        def post(self,url,**kwargs):
+            sent.append(kwargs['json']['domain'])
+            return Response()
+    monkeypatch.setattr(main.httpx,'Client',Client)
+    feedback={'reported_positive':1,'reported_negative':0}
+    leads=[{'domain':'www.example.com','feedback':feedback},
+           {'domain':'example.com','feedback':feedback},
+           {'domain':'invalid..example','feedback':feedback},
+           {'domain':'other.example','feedback':feedback}]
+    result=main._sync_leadflow_feedback('http://localhost:18080','test-token',leads)
+    assert result['attempted']==2
+    assert result['accepted']==2
+    assert sent==['example.com','other.example']
