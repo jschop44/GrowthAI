@@ -1112,7 +1112,14 @@ def intelligence_feedback(body: IntelligenceFeedbackRequest):
                'reported_at': datetime.now(timezone.utc).isoformat(),
                'evidence_type': 'user_reported', 'causal_claim': False}
     stored = learning_engine.store(subject, 'recommendation_outcome', payload, verified=False)
-    return {'accepted': bool(stored.get('stored')), 'persistent': bool(stored.get('persistent')),
+    sync={'attempted':0,'accepted':0,'rejected':0,'unavailable':0}
+    if stored.get('stored') and stored.get('persistent') and os.environ.get('LEADFLOW_API_TOKEN'):
+        base=os.environ.get('LEADFLOW_API_ORIGIN','https://leadflow-research-api.onrender.com').rstrip('/')
+        if base=='https://leadflow-research-api.onrender.com' or base.startswith('http://localhost:'):
+            lead={'domain':urlparse(subject).hostname}
+            enriched=_leadflow_feedback_summary([lead])
+            sync=_sync_leadflow_feedback(base,os.environ['LEADFLOW_API_TOKEN'],enriched)
+    return {'feedback_sync':sync,'accepted': bool(stored.get('stored')), 'persistent': bool(stored.get('persistent')),
             'storage': stored.get('storage'), 'verification': 'user_reported_unverified',
             'used_for': 'bounded_feedback_calibration_only',
             'note': 'A reported outcome is not proof that a recommendation caused the change.'}
