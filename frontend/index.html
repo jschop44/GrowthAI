@@ -463,6 +463,12 @@ footer img{display:block}
       <input id="privateKey" type="password" autocomplete="off" placeholder="Enter your access key">
       <button id="feedbackReadinessButton" type="button">Check LeadFlow connection</button>
       <p id="feedbackReadinessStatus" class="muted small" role="status" aria-live="polite">Checks shared feedback authorization and durable storage without writing data.</p>
+      <details id="leadflowRecentPanel">
+        <summary>Recent businesses from LeadFlow</summary>
+        <button type="button" id="loadLeadFlowRecent">Refresh LeadFlow searches</button>
+        <p id="leadflowRecentStatus" class="muted small" role="status" aria-live="polite">Select a business to prepare a Growth Lens audit.</p>
+        <div id="leadflowRecentList"></div>
+      </details>
       <details class="gl-feedback-form">
         <summary>Report a real business outcome</summary>
         <p class="muted small">Only submit an outcome you personally observed. Reports are unverified and do not prove causation.</p>
@@ -619,6 +625,36 @@ async function api(path, options = {}) {
 
   return data;
 }
+
+$("loadLeadFlowRecent").onclick = async () => {
+  const status=$("leadflowRecentStatus");
+  const list=$("leadflowRecentList");
+  status.textContent="Loading recent LeadFlow searches...";
+  list.replaceChildren();
+  try {
+    const data=await api("/api/intelligence/leadflow-recent-searches");
+    const searches=Array.isArray(data.searches)?data.searches:[];
+    status.textContent=searches.length
+      ? searches.length+" recent businesses from LeadFlow"+(data.persistent?" (persistent history).":".")
+      : "No website-based LeadFlow searches recorded yet. Run a new LeadFlow search and refresh.";
+    for(const item of searches){
+      if(!/^[a-z0-9][a-z0-9.-]{1,250}[a-z0-9]$/.test(item.domain||''))continue;
+      const button=document.createElement("button");
+      button.type="button";
+      button.style.margin="6px 6px 6px 0";
+      button.textContent=(item.name?item.name+" — ":"")+item.domain;
+      button.onclick=()=>{
+        $("url").value="https://"+item.domain;
+        $("url").scrollIntoView({behavior:"smooth",block:"center"});
+        $("status").textContent="LeadFlow business selected. Click Find & audit business to start the Growth Lens audit.";
+      };
+      list.appendChild(button);
+    }
+  }catch(err){status.textContent="LeadFlow history unavailable: "+err.message;}
+};
+$("leadflowRecentPanel").addEventListener("toggle",event=>{
+  if(event.target.open)$("loadLeadFlowRecent").click();
+});
 
 $("outcomeForm").onsubmit = async event => {
   event.preventDefault();
