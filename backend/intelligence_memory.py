@@ -143,7 +143,7 @@ def register_memory_routes(app):
         retrieved = learning_engine.recall(subject, limit=25)
         backup_read_verified = learning_engine.backup_verify(
             next((item.get('id') for item in retrieved.get('observations', []) if item.get('kind') == 'connection_test'), ''), subject) if outcome.get('postgres_backup') else False
-        persisted = outcome.get('persistent', False) and retrieved.get('storage') in ('qdrant', 'qdrant_neural') and any(
+        persisted = outcome.get('persistent', False) and 'qdrant' in retrieved.get('storage','') and any(
             item.get('kind') == 'connection_test' for item in retrieved.get('observations', []))
         semantic=learning_engine.semantic_search('GrowthLens memory connection test',subject=subject,limit=5)
         expected_id=next((item.get('id') for item in retrieved.get('observations',[])
