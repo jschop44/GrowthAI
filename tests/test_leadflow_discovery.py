@@ -69,3 +69,15 @@ def test_leadflow_feedback_fails_closed_when_memory_unavailable():
     assert result['score'] == 72
     assert result['feedback_priority_score'] == 72
     assert result['feedback']['reported_positive'] == 0
+
+def test_feedback_looks_up_duplicate_business_domain_only_once():
+    from backend.main import _leadflow_feedback_summary
+    with patch('backend.learning_engine.recall', return_value={'observations':[]}) as recall:
+        result=_leadflow_feedback_summary([
+            {'domain':'example.com','score':80},
+            {'domain':'www.example.com','score':65},
+            {'domain':'another.example','score':70}])
+    assert len(result)==3
+    assert recall.call_count==2
+    assert result[0]['score']==80
+    assert result[1]['score']==65
