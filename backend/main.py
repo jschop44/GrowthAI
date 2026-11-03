@@ -974,12 +974,12 @@ def verify_memory_on_startup():
                         logger.error('learning_cycle_test status=failed reason=durable_write_unavailable')
                         return
             after=shared_opportunity_score(request)['ranking'][0]
-            recovered=after['outcome_observations']>0
+            recovered=after['outcome_observations']>=5
             changed=after['learning_adjustment']>0
             logger.log(logging.INFO if recovered and changed else logging.ERROR,
                        'learning_cycle_test status=%s phase=%s before_observations=%s after_observations=%s adjustment=%s',
                        'passed' if recovered and changed else 'failed',
-                       'restart_recovery' if prior>0 else 'initial_write',
+                       'restart_recovery' if prior>=5 else 'initial_write',
                        prior,after['outcome_observations'],after['learning_adjustment'])
         except Exception as exc:
             logger.error('learning_cycle_test status=failed error_type=%s',type(exc).__name__)
