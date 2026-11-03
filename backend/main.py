@@ -893,8 +893,8 @@ def _sync_leadflow_feedback(base,token,leads):
     """Return acknowledgement telemetry without treating a request as a successful write."""
     summary={'attempted':0,'accepted':0,'rejected':0,'unavailable':0}
     try:
-        with httpx.Client(timeout=6.0,follow_redirects=False) as client:
-            for lead in leads[:10]:
+        with httpx.Client(timeout=2.0,follow_redirects=False) as client:
+            for lead in leads[:3]:
                 feedback=lead.get('feedback') or {}
                 positive=feedback.get('reported_positive',0)
                 negative=feedback.get('reported_negative',0)
