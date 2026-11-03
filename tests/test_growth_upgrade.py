@@ -124,7 +124,7 @@ def test_robots_decision_distinguishes_disallowed_and_unverified():
             self.text=text
         def get(self,*args,**kwargs):
             return Response(self.code,self.text)
-    assert main.robots_decision(Client(200,'User-agent: *\\nDisallow: /'),'https://example.com/')[0]=='disallowed'
+    assert main.robots_decision(Client(200,'User-agent: *\nDisallow: /'),'https://example.com/')[0]=='disallowed'
     assert main.robots_decision(Client(403),'https://example.com/')[0]=='unverified'
     assert main.robots_decision(Client(404),'https://example.com/')[0]=='allowed'
 
