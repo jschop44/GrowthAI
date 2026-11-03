@@ -889,6 +889,20 @@ def _leadflow_feedback_summary(leads):
         enriched.append(item)
     return sorted(enriched,key=lambda item:(-item.get('feedback_priority_score',item.get('score',0)) if isinstance(item.get('feedback_priority_score',item.get('score',0)),(int,float)) else 0,str(item.get('domain',''))))
 
+def _sync_leadflow_feedback(base,token,leads):
+    """Best-effort, bounded feedback exchange; never blocks discovery."""
+    try:
+        with httpx.Client(timeout=6.0,follow_redirects=False) as client:
+            for lead in leads[:10]:
+                feedback=lead.get('feedback') or {}
+                if not (feedback.get('reported_positive') or feedback.get('reported_negative')):
+                    continue
+                client.post(base+'/intelligence',headers={'x-leadflow-token':token},json={
+                    'action':'feedback-sync','domain':lead.get('domain'),
+                    'positive':feedback['reported_positive'],'negative':feedback['reported_negative']})
+    except httpx.HTTPError:
+        pass
+
 @app.post('/api/intelligence/leadflow-discovery')
 def leadflow_discovery(body: LeadFlowDiscoveryRequest):
     """Read evidence-ranked LeadFlow candidates using server-side credentials only."""
@@ -907,8 +921,10 @@ def leadflow_discovery(body: LeadFlowDiscoveryRequest):
             raise HTTPException(503, 'LeadFlow integration token rejected')
         response.raise_for_status()
         result = response.json()
+        enriched = _leadflow_feedback_summary(result.get('leads', []))
+        _sync_leadflow_feedback(base, token, enriched)
         return {'source': 'LeadFlow', 'model': result.get('model', 'evidence_ranker'),
-                'query': body.query, 'leads': _leadflow_feedback_summary(result.get('leads', [])),
+                'query': body.query, 'leads': enriched,
                 'refresh_queue': result.get('refreshQueue', {}),
                 'catalog_size': result.get('catalogSize'),
                 'integration': 'server_to_server', 'verified_at': datetime.now(timezone.utc).isoformat()}
