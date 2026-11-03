@@ -461,6 +461,8 @@ footer img{display:block}
       <p class="muted small">Your private beta access key unlocks audits, recommendations and saved history.</p>
       <label for="privateKey">Access key</label>
       <input id="privateKey" type="password" autocomplete="off" placeholder="Enter your access key">
+      <button id="feedbackReadinessButton" type="button">Check LeadFlow connection</button>
+      <p id="feedbackReadinessStatus" class="muted small" role="status" aria-live="polite">Checks shared feedback authorization and durable storage without writing data.</p>
       <hr class="gl-divider">
       <p class="muted small">Your key is not saved in browser storage.</p>
     </section>
@@ -601,6 +603,28 @@ async function api(path, options = {}) {
 
   return data;
 }
+
+$("feedbackReadinessButton").onclick = async () => {
+  const button = $("feedbackReadinessButton");
+  const status = $("feedbackReadinessStatus");
+  button.disabled = true;
+  status.textContent = "Checking the secure LeadFlow connection...";
+  try {
+    const result = await api("/api/intelligence/leadflow-feedback-readiness");
+    status.textContent = result.authorized && result.persistent_catalog
+      ? "Connected: shared feedback authorization and persistent catalog are ready."
+      : "Not ready: " + ({
+          integration_not_configured: "LeadFlow integration token is not configured.",
+          shared_feedback_access_denied: "LeadFlow rejected the shared feedback credential.",
+          leadflow_unavailable: "LeadFlow could not be reached.",
+          not_ready: "LeadFlow authorization or persistent storage is unavailable."
+        }[result.reason] || "Connection requires administrator attention.");
+  } catch (error) {
+    status.textContent = "Connection check failed: " + error.message;
+  } finally {
+    button.disabled = false;
+  }
+};
 
 function reportDate(raw) {
   const d = raw ? new Date(raw) : new Date();
