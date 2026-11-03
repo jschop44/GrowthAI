@@ -50,3 +50,22 @@ def test_integration_status_exposes_refresh_queue_without_secrets(monkeypatch):
     assert result['reachable'] is True
     assert result['refresh_queue']['pending'] == 7
     assert 'private-test-token' not in str(result)
+
+def test_leadflow_feedback_calibration_keeps_evidence_score_unchanged():
+    from backend.main import _leadflow_feedback_summary
+    observations=[{'kind':'recommendation_outcome','data':{'improved':True}} for _ in range(5)]
+    with patch('backend.learning_engine.recall', return_value={'observations':observations}) as recall:
+        results=_leadflow_feedback_summary([{'domain':'www.example.com','score':80}])
+    assert recall.call_args.args[0] == 'https://example.com'
+    assert results[0]['score'] == 80
+    assert results[0]['feedback']['reported_positive'] == 5
+    assert results[0]['feedback']['evidence_type'] == 'user_reported_not_verified'
+    assert results[0]['feedback_priority_score'] > 80
+
+def test_leadflow_feedback_fails_closed_when_memory_unavailable():
+    from backend.main import _leadflow_feedback_summary
+    with patch('backend.learning_engine.recall', side_effect=RuntimeError('unavailable')):
+        result=_leadflow_feedback_summary([{'domain':'example.com','score':72}])[0]
+    assert result['score'] == 72
+    assert result['feedback_priority_score'] == 72
+    assert result['feedback']['reported_positive'] == 0
