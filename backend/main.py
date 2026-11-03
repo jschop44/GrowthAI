@@ -862,20 +862,33 @@ def shared_opportunity_score(body: OpportunityScoreRequest):
     domain = urlparse(target).hostname.lower().removeprefix('www.')
     weights = {'contact':18,'lead_capture':17,'primary_action':16,'mobile':15,
                'navigation':12,'trust':11,'structured_data':9,'meta_description':8,'faq':7}
+    # Three independent, explainable analysis stages share the same evidence.
+    # No external paid model, synthetic training data, or fabricated ROI.
+    platform=(body.platform or 'Not verified').lower()
+    business=(body.business_type or 'Unverified').lower()
     candidates=[]
+    seen=set()
     for finding in body.findings:
         if finding.get('passed') is not False:
             continue
         fid=str(finding.get('id',''))[:100]
-        matched=next((w for key,w in weights.items() if key in fid),None)
+        if fid in seen:
+            continue
+        seen.add(fid)
+        matched=next(((key,w) for key,w in weights.items() if key in fid),None)
         if matched is None:
             continue
+        category,base=matched
+        platform_adjustment=3 if category in ('lead_capture','primary_action') and platform in ('shopify','woocommerce') else 0
+        service_adjustment=3 if category in ('contact','lead_capture') and any(k in business for k in ('service','agency','consult')) else 0
+        priority=min(25,base+platform_adjustment+service_adjustment)
         candidates.append({'finding_id':fid,'finding':str(finding.get('name') or fid)[:150],
-                           'priority_score':matched,'reason':'Failed website audit check',
-                           'evidence_type':'observed_audit_finding'})
+                           'priority_score':priority,'base_score':base,
+                           'context_adjustment':platform_adjustment+service_adjustment,
+                           'reason':'Observed failed audit check; context adjustments are heuristic',
+                           'evidence_type':'observed_audit_finding','confidence':'observed_failure'})
     candidates.sort(key=lambda x:(-x['priority_score'],x['finding_id']))
     score=min(100,sum(x['priority_score'] for x in candidates[:5]))
-    # Existing learning ledger provides context, not automatic model training.
     try:
         history=learning_engine.recall('https://'+domain,limit=15)
         memory={'storage':history.get('storage'),'observation_count':len(history.get('observations',[]))}
@@ -884,9 +897,10 @@ def shared_opportunity_score(body: OpportunityScoreRequest):
     return {'domain':domain,'score':score,'ranking':candidates[:10],
             'platform':body.platform or 'Not verified',
             'business_type':body.business_type or 'Unverified',
-            'memory':memory,'model':'shared_evidence_weighted_v1',
+            'memory':memory,'model':'shared_evidence_weighted_v2',
+            'analysis_stages':['evidence_validation','business_context_ranking','memory_retrieval'],
             'trained_neural_network':False,'predicted_revenue':None,
-            'note':'Priority is based on observed failed checks; not a measured conversion probability.'}
+            'note':'Explainable heuristic ranking of observed failures. No measured conversion probability or predicted revenue.'}
 
 from backend.intelligence_memory import register_memory_routes
 MEMORY_SELF_TEST = register_memory_routes(app)
