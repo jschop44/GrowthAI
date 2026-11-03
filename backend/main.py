@@ -864,7 +864,7 @@ def leadflow_discovery(body: LeadFlowDiscoveryRequest):
     try:
         with httpx.Client(timeout=12.0, follow_redirects=False) as client:
             response = client.post(base + '/intelligence',
-                                   headers={'x-api-token': token},
+                                   headers={'x-leadflow-token': token},
                                    json={'query': body.query, 'limit': body.limit})
         if response.status_code in (401, 403):
             raise HTTPException(503, 'LeadFlow integration token rejected')
