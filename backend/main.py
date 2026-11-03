@@ -948,6 +948,25 @@ def leadflow_feedback_readiness():
     except (httpx.HTTPError, ValueError):
         return {'authorized': False, 'persistent_catalog': False, 'reason': 'leadflow_unavailable'}
 
+@app.get('/api/intelligence/leadflow-recent-searches')
+def leadflow_recent_searches():
+    """Read recent LeadFlow business domains through the private server-to-server channel."""
+    base=os.environ.get('LEADFLOW_API_ORIGIN','https://leadflow-research-api.onrender.com').rstrip('/')
+    token=os.environ.get('LEADFLOW_API_TOKEN','')
+    if not token or not (base=='https://leadflow-research-api.onrender.com' or base.startswith('http://localhost:')):
+        raise HTTPException(503,'LeadFlow integration unavailable')
+    try:
+        with httpx.Client(timeout=8.0,follow_redirects=False) as client:
+            response=client.post(base+'/intelligence',headers={'x-leadflow-token':token},
+                                 json={'action':'recent-searches','limit':20})
+        response.raise_for_status()
+        data=response.json()
+        return {'searches':data.get('searches',[]),'persistent':data.get('persistent',False),
+                'source':'LeadFlow shared search history'}
+    except (httpx.HTTPError,ValueError) as exc:
+        raise HTTPException(503,'LeadFlow search history unavailable') from exc
+
+
 @app.post('/api/intelligence/leadflow-discovery')
 def leadflow_discovery(body: LeadFlowDiscoveryRequest):
     """Read evidence-ranked LeadFlow candidates using server-side credentials only."""
