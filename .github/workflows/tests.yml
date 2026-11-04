@@ -40,7 +40,7 @@ jobs:
                   elif name=='LeadFlow':
                       print(json.dumps({'service':name,'health':data.get('status'),'sharedIntelligence':data.get('sharedIntelligence'),'storage':data.get('onlineCatalog',{}).get('storage'),'knowledgeBase':data.get('knowledgeBase')}))
                   else:
-                      print(json.dumps({'service':name,'health':data.get('status'),'fields':sorted(data.keys())}))
+                      print(json.dumps({'service':name,'health':data.get('status'),'fields':sorted(data.keys()),'knowledge_base':data.get('knowledge_base')}))
               except urllib.error.HTTPError as error:
                   if name=='Shared feedback readiness' and error.code==401:
                       print(json.dumps({'service':name,'access':'owner_auth_required','verified':False}))
