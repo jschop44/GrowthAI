@@ -1345,3 +1345,26 @@ def audit_knowledge_preview(request: Request, audit_id: int, query: str = 'websi
             'knowledge_query':query,'evidence':evidence.get('evidence',[]),
             'audit_finding_count':len(result.get('findings',[])) if isinstance(result.get('findings'),list) else None,
             'requires_human_review':True,'changes_to_original_audit':False}
+
+@app.get('/api/intelligence/automation-status')
+def shared_automation_status(request: Request):
+    """Read-only status of LeadFlow's scheduled intelligence cycle."""
+    if os.environ.get('KNOWLEDGE_BASE_ENABLED') != 'true':
+        raise HTTPException(503,'Knowledge intelligence disabled')
+    base=os.environ.get('LEADFLOW_API_ORIGIN','https://leadflow-research-api.onrender.com').rstrip('/')
+    token=os.environ.get('LEADFLOW_API_TOKEN','')
+    if not token or not (base=='https://leadflow-research-api.onrender.com' or base.startswith('http://localhost:')):
+        raise HTTPException(503,'Automation integration unavailable')
+    try:
+        with httpx.Client(timeout=10.0,follow_redirects=False) as client:
+            response=client.post(base+'/intelligence',headers={'x-leadflow-token':token},
+                                 json={'action':'automation-status'})
+        if response.status_code!=200:
+            raise HTTPException(503,'Automation status unavailable')
+        data=response.json()
+        return {'engine':'LeadFlow shared intelligence','enabled':data.get('enabled',False),
+                'running':data.get('running',False),'lastRun':data.get('lastRun'),
+                'lastError':data.get('lastError'),'lastCount':data.get('lastCount',0),
+                'automaticOutreach':False,'reviewRequired':True}
+    except (httpx.HTTPError,ValueError):
+        raise HTTPException(503,'Automation status unavailable')
