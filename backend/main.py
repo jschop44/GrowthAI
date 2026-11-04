@@ -1284,10 +1284,10 @@ def verify_memory_on_startup():
 @app.get('/api/intelligence/knowledge-search')
 def shared_knowledge_search(request: Request, query: str, collection: str = 'business'):
     """Opt-in, read-only knowledge retrieval from LeadFlow's isolated knowledge module."""
-    access=os.environ.get('GROWTHLENS_KNOWLEDGE_ACCESS_TOKEN','')
-    supplied=request.headers.get('x-knowledge-access-token','')
+    access=os.environ.get('GROWTHLENS_PRIVATE_KEY','')
+    supplied=request.headers.get('x-growthlens-key','')
     if not access or not hmac.compare_digest(supplied,access):
-        raise HTTPException(401,'Knowledge access token required')
+        raise HTTPException(401,'Growth Lens owner key required')
     if os.environ.get('KNOWLEDGE_BASE_ENABLED') != 'true':
         raise HTTPException(503, 'Knowledge intelligence disabled')
     if collection not in ('business', 'prospects') or not query.strip() or len(query)>250:
@@ -1311,10 +1311,10 @@ def shared_knowledge_search(request: Request, query: str, collection: str = 'bus
 @app.get('/api/intelligence/knowledge-context')
 def shared_knowledge_context(request: Request, query: str, collection: str = 'business'):
     """Read source-labeled evidence only; does not autonomously generate or send offers."""
-    access=os.environ.get('GROWTHLENS_KNOWLEDGE_ACCESS_TOKEN','')
-    supplied=request.headers.get('x-knowledge-access-token','')
+    access=os.environ.get('GROWTHLENS_PRIVATE_KEY','')
+    supplied=request.headers.get('x-growthlens-key','')
     if not access or not hmac.compare_digest(supplied,access):
-        raise HTTPException(401,'Knowledge access token required')
+        raise HTTPException(401,'Growth Lens owner key required')
     if os.environ.get('KNOWLEDGE_BASE_ENABLED') != 'true':
         raise HTTPException(503,'Knowledge intelligence disabled')
     if collection not in ('business','prospects') or not query.strip() or len(query)>250:
