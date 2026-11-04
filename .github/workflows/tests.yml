@@ -25,7 +25,8 @@ jobs:
           node <<'NODE'
           const fs=require('fs'),cp=require('child_process');
           const html=fs.readFileSync('frontend/index.html','utf8');
-          const scripts=[...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/g)].map(m=>m[1]).filter(Boolean);
+          const script=html.split('<script>')[1]?.split('</script>')[0];
+          const scripts=script?[script]:[];
           if(!scripts.length)throw Error('Growth Lens inline script missing');
           for(let i=0;i<scripts.length;i++){
             const path='/tmp/growth-lens-inline-'+i+'.js';
