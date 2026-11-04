@@ -20,3 +20,9 @@ def test_knowledge_disabled_even_with_valid_access_token(monkeypatch,endpoint):
     with pytest.raises(HTTPException) as exc:
         endpoint(request_with_token('secret-test-token'),query='pricing',collection='business')
     assert exc.value.status_code==503
+
+def test_knowledge_routes_are_unique_and_private():
+    from backend.main import app
+    for path in ('/api/intelligence/knowledge-search','/api/intelligence/knowledge-context'):
+        routes=[route for route in app.routes if getattr(route,'path',None)==path]
+        assert len(routes)==1, f'duplicate or missing route: {path}'
