@@ -1303,3 +1303,26 @@ def shared_knowledge_search(query: str, collection: str = 'business'):
                 'source':'leadflow-knowledge','auto_offer_generation':False}
     except (httpx.HTTPError,ValueError):
         raise HTTPException(503,'Knowledge retrieval unavailable')
+
+@app.get('/api/intelligence/knowledge-context')
+def shared_knowledge_context(query: str):
+    """Read evidence with document IDs for reviewed offers; never automatically send outreach."""
+    if os.environ.get('KNOWLEDGE_BASE_ENABLED') != 'true':
+        raise HTTPException(503, 'Knowledge intelligence disabled')
+    if not query.strip() or len(query)>250:
+        raise HTTPException(422, 'Valid query required')
+    base=os.environ.get('LEADFLOW_API_ORIGIN','https://leadflow-research-api.onrender.com').rstrip('/')
+    token=os.environ.get('LEADFLOW_API_TOKEN','')
+    if not token or not (base=='https://leadflow-research-api.onrender.com' or base.startswith('http://localhost:')):
+        raise HTTPException(503,'Knowledge integration unavailable')
+    try:
+        with httpx.Client(timeout=10.0,follow_redirects=False) as client:
+            response=client.post(base+'/intelligence',headers={'x-leadflow-token':token},
+                                 json={'action':'knowledge-context','query':query})
+        if response.status_code!=200:
+            raise HTTPException(503,'Knowledge context unavailable')
+        result=response.json()
+        return {'context':result.get('context',[]),'requires_human_review':True,
+                'source':'leadflow-knowledge','automatic_email_sending':False}
+    except (httpx.HTTPError,ValueError):
+        raise HTTPException(503,'Knowledge context unavailable')
