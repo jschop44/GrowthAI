@@ -680,7 +680,7 @@ def homepage():
 
 @app.get('/api/health')
 def health():
-    return {'status':'ok','version':'1.1.0','ai_enabled':bool(os.environ.get('GEMINI_API_KEY')),'pagespeed_enabled':True,'knowledge_base':{'enabled':os.environ.get('KNOWLEDGE_BASE_ENABLED')=='true','mode':'disabled-until-explicit-opt-in'}}
+    return {'status':'ok','version':'1.1.0','ai_enabled':bool(os.environ.get('GEMINI_API_KEY')),'pagespeed_enabled':True,'knowledge_base':{'enabled':os.environ.get('KNOWLEDGE_BASE_ENABLED')=='true','mode':'opted-in' if os.environ.get('KNOWLEDGE_BASE_ENABLED')=='true' else 'disabled-until-explicit-opt-in'}}
 
 @app.post('/api/audits')
 def create_audit(body: AuditRequest):
