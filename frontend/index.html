@@ -533,7 +533,7 @@ footer img{display:block}
       <p class="muted small">Find source-linked evidence from LeadFlow for this audit. This does not change the audit or automatically send outreach.</p>
       <label for="knowledgeEvidenceQuery">Knowledge search</label>
       <input id="knowledgeEvidenceQuery" type="text" maxlength="250" value="website conversion" placeholder="e.g. lead capture and accessibility">
-      <button id="knowledgeEvidenceButton" type="button">Find verified evidence</button>
+      <button id="knowledgeEvidenceButton" type="button">Find verified evidence</button><button id="knowledgeAutomationStatus" type="button">Check intelligence automation</button><p id="knowledgeAutomationMessage" class="muted" role="status"></p>
       <div id="knowledgeEvidenceResults" class="muted" aria-live="polite"></div>
     </section>
 
@@ -1038,6 +1038,17 @@ $("aiButton").onclick = async () => {
   } catch (err) {
     $("extras").textContent = err.message;
   }
+};
+
+$("knowledgeAutomationStatus").onclick = async () => {
+  const target=$("knowledgeAutomationMessage");
+  target.textContent="Checking shared intelligence engine...";
+  try{
+    const state=await api("/api/intelligence/automation-status");
+    target.textContent=state.enabled
+      ? "Automation active. Last cycle: "+(state.lastRun||"pending")+". New suggestions: "+(state.lastCount||0)+". Review suggestions in LeadFlow."
+      : "Automation is not enabled in LeadFlow.";
+  }catch(error){target.textContent="Automation status unavailable: "+error.message}
 };
 
 $("knowledgeEvidenceButton").onclick = async () => {
