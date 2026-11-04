@@ -33,3 +33,27 @@ def test_audit_knowledge_preview_requires_access_token(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         audit_knowledge_preview(request_with_token('wrong'),audit_id=1)
     assert exc.value.status_code==401
+
+def test_knowledge_search_propagates_collection_and_returns_source_evidence(monkeypatch):
+    from unittest.mock import patch
+    monkeypatch.setenv('GROWTHLENS_KNOWLEDGE_ACCESS_TOKEN','secret-test-token')
+    monkeypatch.setenv('KNOWLEDGE_BASE_ENABLED','true')
+    monkeypatch.setenv('LEADFLOW_API_TOKEN','private-shared-token')
+    class FakeResponse:
+        status_code=200
+        def json(self):
+            return {'results':[{'id':'doc-id','title':'Service','excerpt':'Supported capability'}]}
+    class FakeClient:
+        def __init__(self,*args,**kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self,*args): pass
+        def post(self,url,headers,json):
+            assert json['collection']=='business'
+            assert json['action']=='knowledge-search'
+            assert headers['x-leadflow-token']=='private-shared-token'
+            return FakeResponse()
+    with patch('backend.main.httpx.Client',FakeClient):
+        result=shared_knowledge_search(request_with_token('secret-test-token'),query='services',collection='business')
+    assert result['results'][0]['id']=='doc-id'
+    assert result['auto_offer_generation'] is False
+    assert 'private-shared-token' not in str(result)
