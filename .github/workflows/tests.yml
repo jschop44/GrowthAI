@@ -38,7 +38,7 @@ jobs:
                   if name=='Shared feedback readiness':
                       print(json.dumps({'service':name,'authorized':data.get('authorized'),'persistent_catalog':data.get('persistent_catalog'),'reason':data.get('reason')}))
                   elif name=='LeadFlow':
-                      print(json.dumps({'service':name,'health':data.get('status'),'sharedIntelligence':data.get('sharedIntelligence'),'storage':data.get('onlineCatalog',{}).get('storage')}))
+                      print(json.dumps({'service':name,'health':data.get('status'),'sharedIntelligence':data.get('sharedIntelligence'),'storage':data.get('onlineCatalog',{}).get('storage'),'knowledgeBase':data.get('knowledgeBase')}))
                   else:
                       print(json.dumps({'service':name,'health':data.get('status'),'fields':sorted(data.keys())}))
               except urllib.error.HTTPError as error:
