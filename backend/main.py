@@ -1334,3 +1334,14 @@ def shared_knowledge_context(request: Request, query: str, collection: str = 'bu
                 'requires_human_review':True,'automatic_send':False}
     except (httpx.HTTPError,ValueError):
         raise HTTPException(503,'Knowledge context unavailable')
+
+@app.get('/api/intelligence/audit-knowledge-preview/{audit_id}')
+def audit_knowledge_preview(request: Request, audit_id: int, query: str = 'website conversion', collection: str = 'business'):
+    """Optional, token-protected evidence overlay; leaves core audit reports unchanged."""
+    evidence=shared_knowledge_context(request,query,collection)
+    audit=get_audit(audit_id)
+    result=audit.get('result') or {}
+    return {'audit_id':audit_id,'audit_url':audit.get('url'),
+            'knowledge_query':query,'evidence':evidence.get('evidence',[]),
+            'audit_finding_count':len(result.get('findings',[])) if isinstance(result.get('findings'),list) else None,
+            'requires_human_review':True,'changes_to_original_audit':False}
