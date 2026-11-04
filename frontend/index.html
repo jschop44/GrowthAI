@@ -528,6 +528,14 @@ footer img{display:block}
     </button>
 
     <div id="extras" class="muted"></div>
+    <section id="knowledgeEvidencePanel" class="no-print" aria-label="Knowledge evidence">
+      <h3>Shared business knowledge</h3>
+      <p class="muted small">Find source-linked evidence from LeadFlow for this audit. This does not change the audit or automatically send outreach.</p>
+      <label for="knowledgeEvidenceQuery">Knowledge search</label>
+      <input id="knowledgeEvidenceQuery" type="text" maxlength="250" value="website conversion" placeholder="e.g. lead capture and accessibility">
+      <button id="knowledgeEvidenceButton" type="button">Find verified evidence</button>
+      <div id="knowledgeEvidenceResults" class="muted" aria-live="polite"></div>
+    </section>
 
     <p class="muted small">
       Scores reflect technical checks on one page.
@@ -1030,6 +1038,32 @@ $("aiButton").onclick = async () => {
   } catch (err) {
     $("extras").textContent = err.message;
   }
+};
+
+$("knowledgeEvidenceButton").onclick = async () => {
+  const target = $("knowledgeEvidenceResults");
+  if (!activeAudit) { target.textContent = "Run an audit first."; return; }
+  const query = $("knowledgeEvidenceQuery").value.trim();
+  if (!query) { target.textContent = "Enter a knowledge search query."; return; }
+  target.textContent = "Checking source-linked knowledge...";
+  try {
+    const result = await api("/api/intelligence/audit-knowledge-preview/" +
+      encodeURIComponent(activeAudit) + "?collection=business&query=" + encodeURIComponent(query));
+    const sources = Array.isArray(result.evidence) ? result.evidence : [];
+    target.replaceChildren();
+    if (!sources.length) { target.textContent = "No matching business knowledge found. Add verified documents in LeadFlow."; return; }
+    for (const source of sources) {
+      const article = document.createElement("article");
+      const heading = document.createElement("strong");
+      heading.textContent = source.title || "Knowledge source";
+      const excerpt = document.createElement("p");
+      excerpt.textContent = source.excerpt || "No excerpt available";
+      const provenance = document.createElement("small");
+      provenance.textContent = "Source document: " + (source.id || "not supplied");
+      article.append(heading,excerpt,provenance);
+      target.append(article);
+    }
+  } catch (error) { target.textContent = "Knowledge evidence unavailable: " + error.message; }
 };
 
 $("speedButton").onclick = () => {
