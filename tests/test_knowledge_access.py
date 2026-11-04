@@ -26,3 +26,10 @@ def test_knowledge_routes_are_unique_and_private():
     for path in ('/api/intelligence/knowledge-search','/api/intelligence/knowledge-context'):
         routes=[route for route in app.routes if getattr(route,'path',None)==path]
         assert len(routes)==1, f'duplicate or missing route: {path}'
+
+def test_audit_knowledge_preview_requires_access_token(monkeypatch):
+    from backend.main import audit_knowledge_preview
+    monkeypatch.setenv('GROWTHLENS_KNOWLEDGE_ACCESS_TOKEN','secret-test-token')
+    with pytest.raises(HTTPException) as exc:
+        audit_knowledge_preview(request_with_token('wrong'),audit_id=1)
+    assert exc.value.status_code==401
