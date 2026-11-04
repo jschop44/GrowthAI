@@ -1282,8 +1282,12 @@ def verify_memory_on_startup():
     threading.Thread(target=learning_cycle_test,daemon=True,name='growthlens-learning-cycle-test').start()
 
 @app.get('/api/intelligence/knowledge-search')
-def shared_knowledge_search(query: str, collection: str = 'business'):
+def shared_knowledge_search(request: Request, query: str, collection: str = 'business'):
     """Opt-in, read-only knowledge retrieval from LeadFlow's isolated knowledge module."""
+    access=os.environ.get('GROWTHLENS_KNOWLEDGE_ACCESS_TOKEN','')
+    supplied=request.headers.get('x-knowledge-access-token','')
+    if not access or not hmac.compare_digest(supplied,access):
+        raise HTTPException(401,'Knowledge access token required')
     if os.environ.get('KNOWLEDGE_BASE_ENABLED') != 'true':
         raise HTTPException(503, 'Knowledge intelligence disabled')
     if collection not in ('business', 'prospects') or not query.strip() or len(query)>250:
@@ -1328,8 +1332,12 @@ def shared_knowledge_context(query: str):
         raise HTTPException(503,'Knowledge context unavailable')
 
 @app.get('/api/intelligence/knowledge-context')
-def shared_knowledge_context(query: str, collection: str = 'business'):
+def shared_knowledge_context(request: Request, query: str, collection: str = 'business'):
     """Read source-labeled evidence only; does not autonomously generate or send offers."""
+    access=os.environ.get('GROWTHLENS_KNOWLEDGE_ACCESS_TOKEN','')
+    supplied=request.headers.get('x-knowledge-access-token','')
+    if not access or not hmac.compare_digest(supplied,access):
+        raise HTTPException(401,'Knowledge access token required')
     if os.environ.get('KNOWLEDGE_BASE_ENABLED') != 'true':
         raise HTTPException(503,'Knowledge intelligence disabled')
     if collection not in ('business','prospects') or not query.strip() or len(query)>250:
