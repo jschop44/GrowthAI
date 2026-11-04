@@ -1280,3 +1280,26 @@ def verify_memory_on_startup():
         except Exception as exc:
             logger.error('learning_cycle_test status=failed error_type=%s',type(exc).__name__)
     threading.Thread(target=learning_cycle_test,daemon=True,name='growthlens-learning-cycle-test').start()
+
+@app.get('/api/intelligence/knowledge-search')
+def shared_knowledge_search(query: str, collection: str = 'business'):
+    """Opt-in, read-only knowledge retrieval from LeadFlow's isolated knowledge module."""
+    if os.environ.get('KNOWLEDGE_BASE_ENABLED') != 'true':
+        raise HTTPException(503, 'Knowledge intelligence disabled')
+    if collection not in ('business', 'prospects') or not query.strip() or len(query)>250:
+        raise HTTPException(422, 'Valid collection and query required')
+    base = os.environ.get('LEADFLOW_API_ORIGIN','https://leadflow-research-api.onrender.com').rstrip('/')
+    token = os.environ.get('LEADFLOW_API_TOKEN','')
+    if not token or not (base == 'https://leadflow-research-api.onrender.com' or base.startswith('http://localhost:')):
+        raise HTTPException(503,'Knowledge integration unavailable')
+    try:
+        with httpx.Client(timeout=10.0,follow_redirects=False) as client:
+            response=client.post(base+'/intelligence',headers={'x-leadflow-token':token},
+                                 json={'action':'knowledge-search','collection':collection,'query':query})
+        if response.status_code!=200:
+            raise HTTPException(503,'Knowledge retrieval unavailable or disabled')
+        result=response.json()
+        return {'collection':collection,'query':query,'results':result.get('results',[]),
+                'source':'leadflow-knowledge','auto_offer_generation':False}
+    except (httpx.HTTPError,ValueError):
+        raise HTTPException(503,'Knowledge retrieval unavailable')
