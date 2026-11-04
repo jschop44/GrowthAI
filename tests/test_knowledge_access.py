@@ -57,3 +57,16 @@ def test_knowledge_search_propagates_collection_and_returns_source_evidence(monk
     assert result['results'][0]['id']=='doc-id'
     assert result['auto_offer_generation'] is False
     assert 'private-shared-token' not in str(result)
+
+def test_audit_evidence_overlay_preserves_original_audit(monkeypatch):
+    from unittest.mock import patch
+    from backend.main import audit_knowledge_preview
+    monkeypatch.setenv('GROWTHLENS_PRIVATE_KEY','secret-test-token')
+    audit={'id':23,'url':'https://example.org','result':{'findings':[{'name':'performance'}]}}
+    with patch('backend.main.get_audit',return_value=audit), patch('backend.main.shared_knowledge_context',return_value={'evidence':[{'id':'doc1','title':'Services','excerpt':'Source text'}]}):
+        result=audit_knowledge_preview(request_with_token('secret-test-token'),audit_id=23,query='conversion')
+    assert result['audit_id']==23
+    assert result['audit_finding_count']==1
+    assert result['evidence'][0]['id']=='doc1'
+    assert result['changes_to_original_audit'] is False
+    assert audit['result']['findings']==[{'name':'performance'}]
