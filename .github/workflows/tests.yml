@@ -20,6 +20,19 @@ jobs:
           python-version: '3.11'
           cache: pip
       - run: python -m pip install -r requirements.txt
+      - name: Validate Growth Lens inline JavaScript syntax
+        run: |
+          node <<'NODE'
+          const fs=require('fs'),cp=require('child_process');
+          const html=fs.readFileSync('frontend/index.html','utf8');
+          const scripts=[...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/g)].map(m=>m[1]).filter(Boolean);
+          if(!scripts.length)throw Error('Growth Lens inline script missing');
+          for(let i=0;i<scripts.length;i++){
+            const path='/tmp/growth-lens-inline-'+i+'.js';
+            fs.writeFileSync(path,scripts[i]);
+            cp.execFileSync('node',['--check',path],{stdio:'inherit'});
+          }
+          NODE
       - run: python -m compileall -q backend
       - run: python -m pytest -q tests/test_growth_upgrade.py
 
