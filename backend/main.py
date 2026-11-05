@@ -30,6 +30,8 @@ app = FastAPI(title='Growth Lens Private Beta', version='1.1.0')
 # Optional, read-only Forge Studio integration adapter (inherits existing API-key middleware).
 from .forge_bridge import router as forge_router
 app.include_router(forge_router)
+from .forge_events import router as forge_events_router
+app.include_router(forge_events_router)
 AUDIT_LOCK = threading.BoundedSemaphore(2)
 
 @app.middleware('http')
