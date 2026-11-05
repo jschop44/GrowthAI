@@ -27,6 +27,9 @@ ROOT = os.path.dirname(os.path.dirname(__file__))
 DB = os.environ.get('GROWTHLENS_DB', os.path.join(ROOT, 'growthlens.db'))
 AGENT = 'GrowthLensAuditBot/0.1 (+public website audit)'
 app = FastAPI(title='Growth Lens Private Beta', version='1.1.0')
+# Optional, read-only Forge Studio integration adapter (inherits existing API-key middleware).
+from .forge_bridge import router as forge_router
+app.include_router(forge_router)
 AUDIT_LOCK = threading.BoundedSemaphore(2)
 
 @app.middleware('http')
