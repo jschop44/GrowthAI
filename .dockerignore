@@ -1,0 +1,11 @@
+.git
+node_modules
+.env
+.env.*
+**/.env
+**/.env.*
+**/__pycache__
+**/*.pyc
+**/*.db
+**/*.sqlite*
+**/*.log

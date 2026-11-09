@@ -1,0 +1,73 @@
+name: Publish verified container
+on:
+  workflow_run:
+    workflows: ["GrowthLens upgrade validation"]
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: verified-container-main
+  cancel-in-progress: true
+jobs:
+  publish:
+    if: >-
+      github.event.repository.private == false &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      IMAGE: ghcr.io/jschop44/growthlens-api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - name: Confirm candidate is current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          test "$current" = "$SOURCE_SHA"
+          verified=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$SOURCE_SHA&per_page=50" --jq '[.workflow_runs[] | select(.name == "GrowthLens upgrade validation" and .event == "push" and .head_branch == "main")] | sort_by(.created_at) | last | .conclusion')
+          test "$verified" = 'success'
+      - name: Build versioned image without production secrets
+        run: docker build --pull --build-arg APP_COMMIT_SHA="$SOURCE_SHA" --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" --label org.opencontainers.image.revision="$SOURCE_SHA" --tag "$IMAGE:sha-$SOURCE_SHA" .
+      - name: Verify image health, source revision and private-route authorization
+        run: |
+          docker run --detach --name release-smoke --publish 127.0.0.1:18080:8000 --env GROWTHLENS_PRIVATE_KEY=container-smoke-only --env GROWTHLENS_DB=/tmp/container-smoke.sqlite "$IMAGE:sha-$SOURCE_SHA"
+          trap 'docker logs release-smoke; docker rm --force release-smoke' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --max-time 2 http://127.0.0.1:18080/api/health -o /tmp/container-health.json; then break; fi
+            sleep 1
+          done
+          test -s /tmp/container-health.json
+          python3 - <<'PYCODE'
+          import json,os
+          data=json.load(open('/tmp/container-health.json'))
+          assert data.get('status')=='ok', 'Image health failed'
+          assert data.get('release')==os.environ['SOURCE_SHA'], 'Image source revision mismatch'
+          print('Image health and source revision verified')
+          PYCODE
+          status=$(curl --silent --max-time 5 --output /dev/null --write-out '%{http_code}'  http://127.0.0.1:18080/api/audits)
+          test "$status" = '401'
+      - name: Publish current verified image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          current=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          test "$current" = "$SOURCE_SHA"
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:sha-$SOURCE_SHA"
+          docker tag "$IMAGE:sha-$SOURCE_SHA" "$IMAGE:latest"
+          docker push "$IMAGE:latest"
+          digest=$(docker image inspect "$IMAGE:sha-$SOURCE_SHA" --format '{{index .RepoDigests 0}}')
+          printf 'Verified image: `%s`\nSource revision: `%s`\nContainer health and authorization passed. This does not mean Render has deployed it.\n' "$digest" "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+          docker logout ghcr.io

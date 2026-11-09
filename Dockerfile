@@ -1,4 +1,6 @@
 FROM python:3.12-slim
+ARG APP_COMMIT_SHA=unversioned
+ENV APP_COMMIT_SHA=$APP_COMMIT_SHA
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip==26.3 && pip install --no-cache-dir -r requirements.txt
