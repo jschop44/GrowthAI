@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: pip install -r requirements.txt
+      - run: python -m pip install --upgrade pip==26.3 && python -m pip install -r requirements.txt
       - name: Python regression suite
         run: PYTHONPATH=. python -m pytest -ra -vv tests
       - run: python -m compileall -q backend
