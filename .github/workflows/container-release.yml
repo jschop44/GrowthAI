@@ -38,7 +38,7 @@ jobs:
           verified=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$SOURCE_SHA&per_page=50" --jq '[.workflow_runs[] | select(.name == "GrowthLens upgrade validation" and .event == "push" and .head_branch == "main")] | sort_by(.created_at) | last | .conclusion')
           test "$verified" = 'success'
       - name: Build versioned image without production secrets
-        run: docker build --pull --build-arg APP_COMMIT_SHA="$SOURCE_SHA" --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" --label org.opencontainers.image.revision="$SOURCE_SHA" --tag "$IMAGE:sha-$SOURCE_SHA" .
+        run: docker build --pull --platform linux/amd64 --provenance=false --sbom=false --build-arg APP_COMMIT_SHA="$SOURCE_SHA" --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" --label org.opencontainers.image.revision="$SOURCE_SHA" --tag "$IMAGE:sha-$SOURCE_SHA" .
       - name: Verify image health, source revision and private-route authorization
         run: |
           docker run --detach --name release-smoke --publish 127.0.0.1:18080:8000 --env GROWTHLENS_PRIVATE_KEY=container-smoke-only --env GROWTHLENS_DB=/tmp/container-smoke.sqlite "$IMAGE:sha-$SOURCE_SHA"
