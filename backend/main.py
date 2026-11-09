@@ -695,9 +695,13 @@ def create_audit(body: AuditRequest):
         raise HTTPException(422,str(exc))
     if not AUDIT_LOCK.acquire(blocking=False):
         raise HTTPException(429, 'Two audits are already running. Please retry shortly.')
-    with database() as conn:
-        cursor=conn.execute('INSERT INTO audits(url,created_at,status) VALUES(?,?,?)',(url,datetime.now(timezone.utc).isoformat(),'running'))
-        audit_id=cursor.lastrowid
+    try:
+        with database() as conn:
+            cursor=conn.execute('INSERT INTO audits(url,created_at,status) VALUES(?,?,?)',(url,datetime.now(timezone.utc).isoformat(),'running'))
+            audit_id=cursor.lastrowid
+    except Exception:
+        AUDIT_LOCK.release()
+        raise HTTPException(503, 'Audit storage unavailable. Please retry shortly.', headers={'Retry-After': '5'}) from None
     try:
         with httpx.Client(trust_env=False) as client:
             robots_state,robots_reason=robots_decision(client,url)
