@@ -343,7 +343,7 @@ def analyze_html(html, url, elapsed_ms):
     viewport = bool(soup.find('meta', attrs={'name':re.compile('^viewport$', re.I)}))
     canonical = soup.find('link', rel=lambda value: value and 'canonical' in value)
     imgs = soup.find_all('img')
-    missing_alt = sum(1 for img in imgs if not img.get('alt','').strip())
+    missing_alt = sum(1 for img in imgs if not img.has_attr('alt'))
     structured = len(soup.find_all('script', type='application/ld+json'))
     links = [urljoin(url, a['href']) for a in soup.find_all('a',href=True)]
     domain = urlparse(url).hostname
@@ -533,7 +533,8 @@ def analyze_html(html, url, elapsed_ms):
             'note':'Automatic scenario using assumed 1,000 monthly visits, 2% conversion, $100 sale, 20% margin and $25/hour labor. Traffic, sales, labor, retention and downtime are not measured. Savings are hypothetical and must not be summed across recommendations.'
         })
     score = sum(f['weight'] for f in findings if f['passed'])
-    return {'url':url,'score':score,'max_score':100,'scoring_scope':'Single-page on-page technical checks; not an overall business growth score','findings':findings,'observations':{'title':title,'meta_description':description,'h1_count':len(h1s),'image_count':len(imgs),'images_missing_alt':missing_alt,'internal_link_count':internal_links,'structured_data_blocks':structured,'fetch_elapsed_ms':round(elapsed_ms),'heading_counts':heading_counts,'document_language':lang,'generic_link_count':generic_links,'unlabeled_inputs':unlabeled_inputs,'social_title_present':bool(og_title),'social_image_present':bool(og_image),'navigation_detected':nav,'branding_detected':logo,'contact_links_detected':contacts,'primary_action_detected':cta,'faq_detected':faq,'trust_signals_detected':trust,'site_search_detected':search},'limitations':['Only the supplied page is analyzed, not the whole site.','No search rankings, traffic, competitor revenue, brand design quality, customer retention, downtime, or AI search visibility are measured.','Fetch time is not a Lighthouse or Core Web Vitals score. UX checks detect HTML signals, not actual ease of use. Financial estimates are illustrative assumptions, not measured returns.']}
+    from backend.quality_metrics import enrich_quality
+    return enrich_quality({'url':url,'score':score,'max_score':100,'scoring_scope':'Single-page on-page technical checks; not an overall business growth score','findings':findings,'observations':{'title':title,'meta_description':description,'h1_count':len(h1s),'image_count':len(imgs),'images_missing_alt':missing_alt,'internal_link_count':internal_links,'structured_data_blocks':structured,'fetch_elapsed_ms':round(elapsed_ms),'heading_counts':heading_counts,'document_language':lang,'generic_link_count':generic_links,'unlabeled_inputs':unlabeled_inputs,'social_title_present':bool(og_title),'social_image_present':bool(og_image),'navigation_detected':nav,'branding_detected':logo,'contact_links_detected':contacts,'primary_action_detected':cta,'faq_detected':faq,'trust_signals_detected':trust,'site_search_detected':search},'limitations':['Only the supplied page is analyzed, not the whole site.','No search rankings, traffic, competitor revenue, brand design quality, customer retention, downtime, or AI search visibility are measured.','Fetch time is not a Lighthouse or Core Web Vitals score. UX checks detect HTML signals, not actual ease of use. Financial estimates are illustrative assumptions, not measured returns.']}, soup, html, url)
 
 def robots_decision(client,url):
     """Return (state, explanation): allowed, disallowed or unverified."""

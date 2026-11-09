@@ -792,6 +792,7 @@ function populateReport(data) {
       "<p><strong>Why:</strong> "+esc(why)+"</p>"+
       "<p><strong>Cost:</strong> "+esc(cost)+"</p>"+
       "<p><strong>Potential impact:</strong> "+esc(impact)+"</p>"+
+      "<p><strong>Verified cost savings:</strong> "+esc(f.cost_savings?.reason||"Not established from this audit.")+"</p>"+
       ((f.implementation_steps||[]).length?"<p><strong>First step:</strong> "+esc(f.implementation_steps[0])+"</p>":"")+
       "</li>";
   }).join(""):"<li>No failed technical checks identified in the available audit scope.</li>";
@@ -870,16 +871,20 @@ function render(data, createdAt = null) {
       " · Downtime cost: "+esc(money(finance.estimated_downtime_cost_usd??0))+
       " · First-year net contribution: "+esc(money(finance.first_year_net_contribution_usd??0))+
       "</p><p class='muted small'>"+esc(finance.note||"Illustrative only; not measured.")+"</p></div>":"";
+    const peer=f.local_peer_comparison;
+    const evidence="<p class='muted small'><strong>Measured savings:</strong> "+esc(f.cost_savings?.reason||"Not established from this page audit.")+"</p>"+
+      (peer?"<p class='muted small'><strong>Nearby peer evidence:</strong> "+esc(peer.passing_count)+" of "+esc(peer.sample_size)+" audited "+esc(peer.industry||"same-niche")+" listings within "+esc(peer.radius_miles)+" miles pass this check. "+esc(peer.note)+"</p>":"");
     const steps=(f.implementation_steps||[]).map(step=>'<li>'+esc(step)+'</li>').join('');
     return "<article class='finding'><details class='recommendation-details' open><summary><span class='"+(f.passed?"ok":"bad")+"'>"+
       (f.passed?"✓ ":"Needs attention · ")+esc(f.name)+"</span>"+
       "<span class='finding-weight'>"+(f.weight?esc(f.weight)+" points":"Additional diagnostic")+"</span></summary>"+
-      "<div class='recommendation-body'><p>"+esc(f.passed?"Check passed.":f.recommendation)+"</p>"+(!f.passed?scenario:"")+
+      "<div class='recommendation-body'><p>"+esc(f.passed?"Check passed.":f.recommendation)+"</p>"+(!f.passed?evidence+scenario:"")+
       (!f.passed&&steps?"<details class='steps-details' open><summary>Step-by-step implementation</summary><ol>"+steps+
         "</ol><p class='muted small'>"+esc(f.verification||'Re-run the audit after publishing.')+"</p></details>":"")+
       "</div></details></article>";
   };
   $("findings").innerHTML=
+    (data.category_metrics?.length?"<details><summary>Measurement coverage and category checks</summary><p>These are source-code indicators. Visual design, rendered mobile usability and Core Web Vitals require separate browser or performance measurements.</p><table><thead><tr><th>Category</th><th>Passed</th><th>Checks</th></tr></thead><tbody>"+data.category_metrics.map(c=>"<tr><td>"+esc(c.category)+"</td><td>"+esc(c.passed)+"</td><td>"+esc(c.checks)+"</td></tr>").join('')+"</tbody></table></details>":"")+
     "<h4>Recommended actions ("+failedFindings.length+")</h4>"+
     failedFindings.sort((a,b)=>(b.weight||0)-(a.weight||0)).map(renderFinding).join('')+
     "<h4>Checks passed ("+passedFindings.length+")</h4>"+

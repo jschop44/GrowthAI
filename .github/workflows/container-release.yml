@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 15
     env:
       SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-      IMAGE: ghcr.io/jschop44/growthlens-api
+      IMAGE: ghcr.io/jschop44/growthai-verified-api
     steps:
       - uses: actions/checkout@v4
         with:
