@@ -1,5 +1,6 @@
 """Independent public-data intelligence workers. No target-site crawling."""
-from concurrent.futures import ThreadPoolExecutor
+from backend.provider_execution import submit_provider
+import sqlite3
 from datetime import datetime, timezone
 import os
 import re
@@ -99,22 +100,28 @@ def run_public_intelligence(url, cik=None):
     subjects = {name: url + ("|cik:" + str(cik) if name == "corporate_filings" else "")
                 for name in jobs}
     for name in jobs:
-        cached = evidence_registry.get(subjects[name], name)
+        try:
+            cached = evidence_registry.get(subjects[name], name)
+        except (sqlite3.Error, OSError):
+            cached = None
         if cached is not None:
             results[name] = cached
             cache_hits.append(name)
         else:
             pending[name] = jobs[name]
     if pending:
-        with ThreadPoolExecutor(max_workers=min(5, len(pending))) as executor:
-            futures = {name: executor.submit(fn, *args) for name, (fn, args) in pending.items()}
-            for name, future in futures.items():
-                try:
-                    results[name] = future.result()
-                except Exception:
-                    results[name] = {"status": "unavailable", "source": name,
-                                     "reason": "Provider worker encountered an error"}
+        futures = {name: submit_provider(subjects[name], name, fn, args)
+                   for name, (fn, args) in pending.items()}
+        for name, future in futures.items():
+            try:
+                results[name] = future.result()
+            except Exception:
+                results[name] = {"status": "unavailable", "source": name,
+                                 "reason": "Provider worker encountered an error"}
+            try:
                 evidence_registry.put(subjects[name], name, results[name])
+            except (sqlite3.Error, OSError):
+                pass  # Cache failure must not discard fresh source evidence.
     # Stable order for clients regardless of worker completion order.
     results = {name: results[name] for name in jobs}
     return {"status": "completed_with_independent_provider_results",

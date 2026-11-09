@@ -112,8 +112,9 @@ def test_business_lookup_rejects_unrelated_search_results_from_live_failure():
     assert result[0]['website']=='https://www.tamberinos.online/'
 
 
-def test_robots_decision_distinguishes_disallowed_and_unverified():
+def test_robots_decision_distinguishes_disallowed_and_unverified(monkeypatch):
     from backend import main
+    monkeypatch.setattr(main, 'validate_url', lambda url: url)  # URL safety is tested separately; no live DNS here.
     class Response:
         def __init__(self,code,text=''):
             self.status_code=code
@@ -320,6 +321,7 @@ def test_feedback_sync_deduplicates_domains_and_ignores_invalid_targets(monkeypa
 
 def test_outcome_submission_immediately_syncs_persisted_feedback(monkeypatch):
     from backend import main
+    monkeypatch.setattr(main, 'validate_url', lambda url: url)  # URL safety is tested separately; no live DNS here.
     from backend import learning_engine
     monkeypatch.setenv('LEADFLOW_API_TOKEN','isolated-test-token')
     monkeypatch.setenv('LEADFLOW_API_ORIGIN','http://localhost:18080')
@@ -341,6 +343,7 @@ def test_outcome_submission_immediately_syncs_persisted_feedback(monkeypatch):
 
 def test_outcome_submission_does_not_sync_unpersisted_feedback(monkeypatch):
     from backend import main
+    monkeypatch.setattr(main, 'validate_url', lambda url: url)  # URL safety is tested separately; no live DNS here.
     from backend import learning_engine
     monkeypatch.setenv('LEADFLOW_API_TOKEN','isolated-test-token')
     monkeypatch.setattr(learning_engine,'store',lambda *a,**k:{'stored':True,'persistent':False,'storage':'ephemeral'})

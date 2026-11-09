@@ -100,16 +100,24 @@ def opportunity_worker(results):
                 website["classification"].get("key"), discovery.get("competitors", []), []),
             "note": "No competitor feature gaps inferred from business listings alone; financial scenarios are hypothetical."}
 
+def worker_result(future, source):
+    try:
+        return future.result()
+    except Exception:
+        return {"status": "unavailable", "source": source,
+                "reason": "Worker failed; other source results are retained"}
+
+
 def run_team(url, address, radius, cik, validate_url, fetch_public, robots_allowed, analyze_html, industry=None):
     # Independent external intelligence and permitted homepage audit start together.
     with ThreadPoolExecutor(max_workers=3) as pool:
         public_future = pool.submit(run_public_intelligence, url, cik)
         website_future = pool.submit(website_worker, url, validate_url, fetch_public, robots_allowed, analyze_html)
-        website = website_future.result()
+        website = worker_result(website_future, "Target website")
         discovery_future = pool.submit(discovery_worker, website, address, radius, industry)
-        public = public_future.result()
-        discovery = discovery_future.result()
-    results = {"website": website, "discovery": discovery, **public["engines"]}
+        public = worker_result(public_future, "Public intelligence")
+        discovery = worker_result(discovery_future, "Business discovery")
+    results = {"website": website, "discovery": discovery, **public.get("engines", {})}
     verification = verification_worker(results)
     opportunities = opportunity_worker(results)
     # Record only source-attributed observations; availability is not independent verification.
