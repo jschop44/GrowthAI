@@ -1,0 +1,59 @@
+name: Encrypted owner audit-history backup
+on:
+  workflow_dispatch:
+    inputs:
+      restore_to_postgres:
+        description: 'Restore and verify this snapshot in the configured PostgreSQL target before any application cutover'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: owner-audit-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    if: github.ref == 'refs/heads/main' && github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify snapshot and encryption behavior
+        run: node --test tests/audit-backup.test.mjs
+      - name: Fetch owner history and verify encrypted snapshot in memory
+        id: backup
+        env:
+          GROWTHLENS_PRIVATE_KEY: ${{ secrets.GROWTHLENS_PRIVATE_KEY }}
+        run: node scripts/backup-audits.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-growthlens-audit-history
+          path: ${{ steps.backup.outputs.path }}
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/setup-python@v5
+        if: inputs.restore_to_postgres
+        with:
+          python-version: '3.12'
+      - name: Install existing application dependencies for optional restoration
+        if: inputs.restore_to_postgres
+        run: python -m pip install --upgrade pip==26.3 && python -m pip install -r requirements.txt
+      - name: Restore and verify without overwriting conflicting history
+        if: inputs.restore_to_postgres
+        env:
+          GROWTHLENS_PRIVATE_KEY: ${{ secrets.GROWTHLENS_PRIVATE_KEY }}
+          GROWTHLENS_AUDIT_STORAGE: postgres
+          GROWTHLENS_AUDIT_DATABASE_URL: ${{ secrets.GROWTHLENS_AUDIT_DATABASE_URL }}
+          SNAPSHOT_PATH: ${{ steps.backup.outputs.path }}
+          PYTHONPATH: .
+        run: |
+          set -o pipefail
+          node scripts/backup-audits.mjs --decrypt "$SNAPSHOT_PATH" | python scripts/restore-audits.py
+      - name: Explain restoration requirement
+        run: |
+          echo 'Encrypted audit-history snapshot verified. Restore it before approving a storage cutover. Decryption requires the owner key used for this snapshot; retain that key securely when rotating access credentials. This export excludes organization-linked histories and refuses to run while audits are active.' >> "$GITHUB_STEP_SUMMARY"

@@ -36,6 +36,8 @@ jobs:
         with:
           node-version: '22'
       - run: python -m pip install --upgrade pip==26.3 && python -m pip install -r requirements.txt
+      - name: Verify encrypted audit-history backups
+        run: node --test tests/audit-backup.test.mjs
       - name: Python regression suite
         run: PYTHONPATH=. python -m pytest -ra -vv tests
       - name: Verify durable audit storage against disposable PostgreSQL

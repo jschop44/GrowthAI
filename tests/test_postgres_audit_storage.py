@@ -55,3 +55,16 @@ def test_actual_audit_api_preserves_reports_and_history(database,monkeypatch):
     assert result.status_code==200 and result.json()['result']['url']=='https://example.com'
     assert client.get('/api/audits',headers=headers).json()[0]['id']==identifier
     assert client.get('/api/audits').status_code==401
+
+
+def test_restore_is_idempotent_preserves_reports_and_advances_identifiers(database):
+    from backend.audit_restore import restore_snapshot
+    snapshot={'version':1,'source':'https://growthlens-free-test.onrender.com','created_at':'2026-11-10T00:00:00Z','cutoff_id':41,'records':[{'id':41,'organization_id':None,'url':'https://example.com','created_at':'2026-11-10T00:00:00Z','status':'completed','score':75,'result':{'score':75}}]}
+    assert restore_snapshot(snapshot)['inserted']==1
+    assert restore_snapshot(snapshot)['already_present']==1
+    with store.postgres_database() as connection:
+        identifier=connection.execute('INSERT INTO audits(url,created_at,status) VALUES(?,?,?)',('https://next.example','date','running')).lastrowid
+        assert identifier==42
+    conflicting={**snapshot,'records':[{**snapshot['records'][0],'score':10}]}
+    with pytest.raises(ValueError,match='different data'):restore_snapshot(conflicting)
+    with store.postgres_database() as connection:assert connection.execute('SELECT * FROM audits WHERE id=?',(41,)).fetchone()['score']==75
