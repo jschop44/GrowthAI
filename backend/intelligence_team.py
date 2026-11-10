@@ -13,6 +13,7 @@ from backend.local_competition import (
     geocode, discover_competitors, industry_recommendations, INDUSTRIES,
 )
 from backend.financial_intelligence import estimate_opportunities
+from backend.quality_metrics import recommendation_order
 
 class TeamRequest(BaseModel):
     url: str = Field(min_length=4, max_length=2048)
@@ -92,8 +93,11 @@ def opportunity_worker(results):
                 "reason": "No permitted homepage observations or usable competitor listings"}
     findings = website["audit"]["findings"]
     recommendations = [{"issue": f["name"], "recommendation": f["recommendation"],
-                        "evidence": "Observed homepage technical check", "confidence": "homepage-only"}
-                       for f in findings if not f["passed"]]
+                        "evidence": f.get("evidence") or "Observed homepage technical check",
+                        "confidence": "homepage-only", "finding_id": f.get("id"),
+                        "priority": f.get("priority"), "cost_savings": f.get("cost_savings"),
+                        "local_peer_comparison": f.get("local_peer_comparison")}
+                       for f in sorted(findings, key=recommendation_order) if not f["passed"]]
     return {"status": "available", "source": "GrowthLens opportunity engine",
             "recommendations": recommendations + website.get("industry_recommendations", []),
             "financial_scenarios": estimate_opportunities(

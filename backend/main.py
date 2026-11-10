@@ -770,7 +770,8 @@ class AIRequest(BaseModel):
     audit_id: int = Field(gt=0)
 
 def fallback_explanation(evidence):
-    failed=sorted((f for f in evidence['findings'] if not f['passed']),key=lambda f:f['weight'],reverse=True)
+    from backend.quality_metrics import recommendation_order
+    failed=sorted((f for f in evidence['findings'] if not f['passed']),key=recommendation_order)
     if not failed:
         return 'All tested single-page checks passed. This does not establish search rankings, conversions, or business performance.'
     return '\n\n'.join(f"{i}. {f['name']} ({f['weight']} points): {f['recommendation']}" for i,f in enumerate(failed[:5],1)) + '\n\nScope: one publicly accessible page; no competitor or revenue data was measured.'
@@ -1165,6 +1166,9 @@ def shared_opportunity_score(body: OpportunityScoreRequest):
     domain = urlparse(target).hostname.lower().removeprefix('www.')
     weights = {'contact':18,'lead_capture':17,'primary_action':16,'mobile':15,
                'navigation':12,'trust':11,'structured_data':9,'meta_description':8,'faq':7}
+    diagnostics = {'secure_forms':25, 'mixed_content':24, 'accessible_links':16,
+                   'main_landmark':12, 'blocking_scripts':15, 'image_dimensions':14,
+                   'schema_validity':10}
     # Three independent, explainable analysis stages share the same evidence.
     # No external paid model, synthetic training data, or fabricated ROI.
     platform=(body.platform or 'Not verified').lower()
@@ -1178,7 +1182,7 @@ def shared_opportunity_score(body: OpportunityScoreRequest):
         if fid in seen:
             continue
         seen.add(fid)
-        matched=next(((key,w) for key,w in weights.items() if key in fid),None)
+        matched=(fid,diagnostics[fid]) if fid in diagnostics else next(((key,w) for key,w in weights.items() if key in fid),None)
         if matched is None:
             continue
         category,base=matched
@@ -1190,7 +1194,7 @@ def shared_opportunity_score(body: OpportunityScoreRequest):
                            'context_adjustment':platform_adjustment+service_adjustment,
                            'reason':'Observed failed audit check; context adjustments are heuristic',
                            'evidence_type':'observed_audit_finding','confidence':'observed_failure'})
-    candidates.sort(key=lambda x:(-x['priority_score'],x['finding_id']))
+    candidates.sort(key=lambda x:(x['finding_id'] not in ('secure_forms','mixed_content'),-x['priority_score'],x['finding_id']))
     # Bounded online learning from reported outcomes for this business only.
     # User-reported outcomes are weak evidence and never treated as causal proof.
     try:
@@ -1218,7 +1222,7 @@ def shared_opportunity_score(body: OpportunityScoreRequest):
         candidate['learning_adjustment']=adjustment
         candidate['outcome_observations']=n
         candidate['outcome_evidence']='user_reported_not_causal'
-    candidates.sort(key=lambda x:(-x['priority_score'],x['finding_id']))
+    candidates.sort(key=lambda x:(x['finding_id'] not in ('secure_forms','mixed_content'),-x['priority_score'],x['finding_id']))
     score=min(100,sum(x['priority_score'] for x in candidates[:5]))
     try:
         history=learning_engine.recall('https://'+domain,limit=15)

@@ -21,6 +21,22 @@ def test_team_route_requires_private_key():
     response = TestClient(app).post("/api/intelligence-team", json={"url": "https://example.com"})
     assert response.status_code == 401
 
+
+def test_opportunity_engine_preserves_diagnostic_evidence_and_cost_limits():
+    savings = {'status': 'not_estimated', 'annual_usd': None}
+    evidence = {'source_url': 'https://example.com/', 'method': 'static_html'}
+    result = team.opportunity_worker({'website': {'status': 'available', 'classification': {'key': 'dentist'},
+        'audit': {'findings': [
+            {'id': 'meta_description', 'name': 'Description', 'weight': 12, 'passed': False, 'recommendation': 'Describe the business'},
+            {'id': 'secure_forms', 'name': 'Secure forms', 'weight': 0, 'passed': False, 'priority': 'high',
+             'recommendation': 'Use HTTPS', 'evidence': evidence, 'cost_savings': savings}]}},
+        'discovery': {'competitors': []}})
+    first = result['recommendations'][0]
+    assert first['finding_id'] == 'secure_forms'
+    assert first['evidence'] == evidence
+    assert first['cost_savings'] == savings
+    assert first['local_peer_comparison'] is None
+
 def test_discovery_with_blocked_website_and_explicit_industry(monkeypatch):
     class Client:
         def __init__(self, *args, **kwargs): pass

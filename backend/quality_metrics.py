@@ -4,6 +4,15 @@ from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
 
+SECURITY_FINDINGS = frozenset({'mixed_content', 'secure_forms'})
+
+
+def recommendation_order(finding):
+    """Keep observed security failures ahead of cosmetic score opportunities."""
+    return (finding.get('id') not in SECURITY_FINDINGS,
+            finding.get('priority') != 'high', -finding.get('weight', 0))
+
+
 def enrich_quality(result, soup, html, url):
     images = soup.find_all('img')
     scripts = soup.find_all('script', src=True)

@@ -728,6 +728,8 @@ function populateReport(data) {
   const failed = findings
     .filter(f => !f.passed)
     .sort((a, b) =>
+      Number(['mixed_content','secure_forms'].includes(b.id)) - Number(['mixed_content','secure_forms'].includes(a.id)) ||
+      Number(b.priority === 'high') - Number(a.priority === 'high') ||
       Number(b.weight || 0) - Number(a.weight || 0)
     );
 

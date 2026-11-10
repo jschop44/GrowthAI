@@ -51,3 +51,29 @@ def test_peer_prevalence_excludes_unavailable_distant_and_unmeasured_sites():
     assert comparison['sources'][0]['url'] == 'https://local.example'
     assert findings[0]['cost_savings']['annual_usd'] is None
     assert comparison['industry'] == 'dentist'
+
+
+def test_security_failures_reach_explanations_and_shared_outreach_ranking(monkeypatch):
+    from backend.main import fallback_explanation, shared_opportunity_score, OpportunityScoreRequest
+    from backend import learning_engine
+    monkeypatch.setattr(learning_engine, 'recall', lambda *args, **kwargs: {'observations': []})
+    report = analyze_html('<html><form action="http://example.com/send"></form></html>', 'https://example.com/', 2)
+    explanation = fallback_explanation(report)
+    assert explanation.startswith('1. Secure form destinations')
+    ranking = shared_opportunity_score(OpportunityScoreRequest(website='https://example.com/', findings=report['findings']))['ranking']
+    assert ranking[0]['finding_id'] == 'secure_forms'
+    assert 'main_landmark' in [item['finding_id'] for item in ranking]
+    # Passing checks must not become outreach opportunities.
+    assert 'mixed_content' not in [item['finding_id'] for item in ranking]
+
+
+def test_security_order_survives_negative_user_reported_feedback(monkeypatch):
+    from backend.main import shared_opportunity_score, OpportunityScoreRequest
+    from backend import learning_engine
+    monkeypatch.setattr(learning_engine, 'recall', lambda *args, **kwargs: {'observations': [
+        {'kind': 'recommendation_outcome', 'data': {'recommendation_id': 'mixed_content', 'improved': False}}
+        for _ in range(25)]})
+    result = shared_opportunity_score(OpportunityScoreRequest(website='https://example.com/', platform='shopify', findings=[
+        {'id': 'contact', 'passed': False}, {'id': 'lead_capture', 'passed': False},
+        {'id': 'mixed_content', 'passed': False}, {'id': 'image_dimensions', 'passed': False}]))
+    assert result['ranking'][0]['finding_id'] == 'mixed_content'
