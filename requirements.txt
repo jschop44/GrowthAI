@@ -5,5 +5,3 @@ beautifulsoup4>=4.12,<5
 pydantic>=2,<3
 pytest>=8,<10
 psycopg[binary]>=3.2,<4
-Authlib>=1.6,<2
-itsdangerous>=2.2,<3
