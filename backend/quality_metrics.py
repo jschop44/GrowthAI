@@ -87,7 +87,7 @@ def enrich_quality(result, soup, html, url):
 def local_peer_evidence(findings, competitors, industry, radius_miles):
     """Attach observed local peer prevalence; never infer competitor finances."""
     for finding in findings:
-        eligible = [c for c in competitors if c.get('status') == 'audited'
+        eligible = [c for c in competitors if c.get('status') == 'audited' and c.get('peer_eligible') is not False
                     and isinstance(c.get('distance_miles'), (float, int)) and 0 <= c['distance_miles'] <= radius_miles]
         observations = [(c, next((f for f in c.get('findings', []) if f.get('id') == finding['id'] and isinstance(f.get('passed'), bool)), None)) for c in eligible]
         observations = [(c, f) for c, f in observations if f is not None]

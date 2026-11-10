@@ -385,18 +385,25 @@ def register_local_routes(app, validate_url, fetch_public, robots_allowed, analy
                         started=time.monotonic();r,real=fetch_public(client,safe)
                         comp=analyze_html(r.text,real,(time.monotonic()-started)*1000)
                         row.update(score=comp['score'],status='audited',findings=comp['findings'],website=real,features=observed_features(r.text,classification.get('key'),real))
+                        peer_classification=classify_business(r.text,extract_identity(r.text,real),real)
+                        row['peer_classification']=peer_classification
+                        row['peer_eligible']=bool(classification.get('key') and peer_classification.get('key')==classification['key'] and peer_classification.get('confidence') in ('medium','high'))
+                        if not row['peer_eligible']:
+                            row['peer_exclusion_reason']='Fetched homepage did not corroborate the target business niche with sufficient confidence.'
                 except (httpx.HTTPError,ValueError) as exc: row['status']='unavailable: '+str(exc)[:90]
                 competitors.append(row)
-        from backend.quality_metrics import local_peer_evidence
+        from backend.quality_metrics import local_peer_evidence,recommendation_order
         local_peer_evidence(audit['findings'], competitors, classification.get('key'), body.radius_miles)
         opportunities=[]
-        for f in sorted((f for f in audit['findings'] if not f['passed']),key=lambda x:-x['weight']):
-            rivals=[c['name'] for c in competitors if c['score'] is not None and any(x['id']==f['id'] and x['passed'] for x in c['findings'])]
+        for f in sorted((f for f in audit['findings'] if not f['passed']),key=recommendation_order):
+            eligible_urls={source['url'] for source in f['local_peer_comparison']['sources']}
+            rivals=[c['name'] for c in competitors if c.get('website') in eligible_urls and any(x['id']==f['id'] and x['passed'] for x in c['findings'])]
             opportunities.append({'priority':len(opportunities)+1,'issue':f['name'],'recommendation':f['recommendation'],'weight':f['weight'],'local_peer_comparison':f.get('local_peer_comparison'),'cost_savings':f.get('cost_savings'),'competitors_passing_check':rivals,'evidence':'Failed check on target page'+('; passing competitor: '+', '.join(rivals[:3]) if rivals else '')})
-        comparison = compare_features(target_features, competitors)
+        eligible_peers=[c for c in competitors if c.get('peer_eligible') is True]
+        comparison = compare_features(target_features, eligible_peers)
         from backend.financial_intelligence import estimate_opportunities
         feature_gaps = [item for item in comparison if not item['target_observed'] and item['competitors_with_feature']]
-        financial_scenarios = estimate_opportunities(classification.get('key'), competitors, feature_gaps)
+        financial_scenarios = estimate_opportunities(classification.get('key'), eligible_peers, feature_gaps)
         memory_status={'stored':False,'persistent':False}
         try:
             from backend import learning_engine

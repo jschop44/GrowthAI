@@ -45,6 +45,7 @@ def test_peer_prevalence_excludes_unavailable_distant_and_unmeasured_sites():
              {'name': 'Far', 'status': 'audited', 'distance_miles': 60, 'findings': [{'id': 'contact', 'passed': True}]},
              {'name': 'Blocked', 'status': 'blocked', 'distance_miles': 1},
              {'name': 'No evidence', 'status': 'audited', 'distance_miles': 1, 'findings': []}]
+    peers.append({'name':'Wrong niche','status':'audited','distance_miles':1,'peer_eligible':False,'website':'https://unrelated.example','findings':[{'id':'contact','passed':True}]})
     local_peer_evidence(findings, peers, 'dentist', 15)
     comparison = findings[0]['local_peer_comparison']
     assert comparison['sample_size'] == comparison['passing_count'] == 1
