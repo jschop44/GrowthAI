@@ -428,6 +428,7 @@ header{background:#fffffff0;border-bottom-color:#e0e8ef}.brand-logo{width:46px;h
 main{padding-top:46px}.gl-hero h1{letter-spacing:-.055em;line-height:1.1}.gl-eyebrow{color:#08745d}.card{border-radius:22px;box-shadow:0 8px 30px #243b550b}.gl-workspace .gl-audit{border-top:3px solid #249e7e}.gl-workspace .gl-access{background:linear-gradient(145deg,#fff,#f0f5ff);border-top:3px solid #6b96de}.gl-chip{box-shadow:0 2px 6px #243b5506}button{border-radius:12px}input,select{border-radius:12px;background:#fcfdff}.gl-audit #auditButton{box-shadow:0 6px 16px #116a5c24}header .brand{font-size:23px}.gl-section-label{color:#52697e}summary{cursor:pointer}a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #1677d2;outline-offset:3px}
 @media(max-width:600px){main{padding-top:28px}header .brand{font-size:20px}.brand-logo{width:38px;height:38px}.card{border-radius:18px}}
 }
+@media screen{.gl-google-signin{background:#fff;color:#25314a;border:1px solid #c5d0df;border-radius:12px;padding:12px 18px;text-decoration:none;font-weight:650;margin:8px 0 14px}.gl-google-signin:hover{background:#f1f5fb}#legacyAccess{margin:14px 0}}
 </style>
 </head>
 <body>
@@ -465,10 +466,15 @@ main{padding-top:46px}.gl-hero h1{letter-spacing:-.055em;line-height:1.1}.gl-eye
     </section>
     <section class="card gl-access">
       <span class="gl-section-label">Secure workspace</span>
-      <h2>Private access</h2>
-      <p class="muted small">Your private beta access key unlocks audits, recommendations and saved history.</p>
-      <label for="privateKey">Access key</label>
-      <input id="privateKey" type="password" autocomplete="off" placeholder="Enter your access key">
+      <h2>Your workspace</h2>
+      <p id="signInStatus" class="muted small" role="status" aria-live="polite">Checking sign-in…</p>
+      <a id="googleSignIn" href="/auth/google" hidden style="display:none" class="gl-google-signin">Continue with Google</a>
+      <button id="signOut" type="button" hidden>Sign out</button>
+      <details id="legacyAccess"><summary>Administrator access</summary>
+      <p class="muted small">Recovery access for the workspace administrator.</p>
+      <label for="privateKey">Administrator key</label>
+      <input id="privateKey" type="password" autocomplete="off" placeholder="Administrator recovery key">
+      </details>
       <button id="feedbackReadinessButton" type="button" hidden>Check LeadFlow connection</button>
       <p id="feedbackReadinessStatus" class="muted small" role="status" aria-live="polite">Checks shared feedback authorization and durable storage without writing data.</p>
       <details id="leadflowRecentPanel">
@@ -494,7 +500,7 @@ main{padding-top:46px}.gl-hero h1{letter-spacing:-.055em;line-height:1.1}.gl-eye
         <p id="outcomeStatus" class="muted small" role="status" aria-live="polite"></p>
       </details>
       <hr class="gl-divider">
-      <p class="muted small">Your key is not saved in browser storage.</p>
+      <p class="muted small">Your sign-in stays in a secure browser cookie.</p>
     </section>
   </div>
 
@@ -575,7 +581,7 @@ main{padding-top:46px}.gl-hero h1{letter-spacing:-.055em;line-height:1.1}.gl-eye
   <section class="card">
     <h2>Recent Audits</h2>
     <div id="history" class="muted">
-      Enter your access key to load audit history.
+      Sign in to load your saved audit history.
     </div>
   </section>
 </main>
@@ -608,18 +614,20 @@ let activeAudit = null;
 let activeAuditUrl = "";
 let activeAuditDate = null;
 
+let signedIn = false;
 async function api(path, options = {}) {
   const key = $("privateKey").value.trim();
 
-  if (!key) {
-    throw Error("Enter your private access key first.");
+  if (!key && !signedIn) {
+    throw Error("Sign in with Google to open your workspace.");
   }
 
   const response = await fetch(path, {
     ...options,
+    credentials: "same-origin",
     headers: {
       ...(options.headers || {}),
-      "X-GrowthLens-Key": key
+      ...(key ? {"X-GrowthLens-Key": key} : {})
     }
   });
 
@@ -1131,6 +1139,34 @@ $("printButton").onclick = () => window.print();
 
 <script src="/local-competition.js"></script>
 <script src="/local-premium.js"></script>
+<script>
+async function restoreSignIn() {
+  try {
+    const response = await fetch('/auth/session', {credentials:'same-origin', cache:'no-store'});
+    if (!response.ok) throw Error('Sign-in status unavailable. Please reload.');
+    const session = await response.json();
+    signedIn = session.authenticated === true;
+    $('googleSignIn').hidden = !session.configured || signedIn;
+    $('googleSignIn').style.display = !session.configured || signedIn ? 'none' : 'inline-block';
+    $('signOut').hidden = !signedIn;
+    $('legacyAccess').hidden = signedIn;
+    $('signInStatus').textContent = signedIn ? 'Signed in as ' + session.email :
+      !session.configured ? 'Google sign-in is awaiting administrator setup. Administrator access remains available below.' :
+      new URLSearchParams(location.search).get('signin') === 'failed' ? 'Sign-in could not be completed. Use an approved Google account and try again.' :
+      'Sign in once with your approved Google account. No API key needed.';
+    if (signedIn) { loadHistory(); $('feedbackReadinessButton').click(); window.dispatchEvent(new Event('growthlens-session')); }
+  } catch (error) { $('signInStatus').textContent = error.message; }
+}
+$('signOut').onclick = async () => {
+  $('signOut').disabled = true;
+  try {
+    const response = await fetch('/auth/logout', {method:'POST', credentials:'same-origin'});
+    if (!response.ok) throw Error('Sign-out failed. Please try again.');
+    location.replace('/');
+  } catch (error) { $('signInStatus').textContent = error.message; $('signOut').disabled = false; }
+};
+restoreSignIn();
+</script>
 
 </body>
 </html>

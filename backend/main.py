@@ -34,22 +34,32 @@ from .forge_bridge import router as forge_router
 app.include_router(forge_router)
 from .forge_events import router as forge_events_router
 app.include_router(forge_events_router)
+from .browser_auth import router as auth_router, browser_owner, same_origin, install_session
+app.include_router(auth_router)
 AUDIT_LOCK = threading.BoundedSemaphore(2)
 
 @app.middleware('http')
 async def private_access(request: Request, call_next):
     from fastapi.responses import JSONResponse
+    valid_browser = False
     if request.url.path.startswith('/api/') and request.url.path not in ('/api/health',):
         expected = os.environ.get('GROWTHLENS_PRIVATE_KEY', '')
         supplied = request.headers.get('X-GrowthLens-Key', '')
         integration_key = os.environ.get('GROWTHLENS_LEADFLOW_KEY', '')
         valid_owner = bool(expected) and hmac.compare_digest(expected, supplied)
         valid_leadflow = request.url.path in ('/api/audits','/api/intelligence/opportunity-score') and bool(integration_key) and hmac.compare_digest(integration_key, supplied)
-        if not (valid_owner or valid_leadflow):
+        valid_browser = browser_owner(request)
+        if valid_browser and not (valid_owner or valid_leadflow) and request.method not in ('GET', 'HEAD', 'OPTIONS') and not same_origin(request):
+            return JSONResponse({'detail': 'Same-origin request required.'}, status_code=403)
+        if not (valid_owner or valid_leadflow or valid_browser):
             return JSONResponse({'detail': 'Private access key required or invalid.'}, status_code=401)
-    return await call_next(request)
+    response = await call_next(request)
+    if valid_browser:
+        response.headers['Cache-Control'] = 'private, no-store'
+    return response
 
 app.add_middleware(CORSMiddleware, allow_origins=['http://localhost:8000','http://127.0.0.1:8000'], allow_methods=['GET','POST'], allow_headers=['*'])
+install_session(app)
 
 @contextmanager
 def database():

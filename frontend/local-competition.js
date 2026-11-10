@@ -66,11 +66,11 @@
   }));
   $('memoryHealthRun').onclick = async () => {
     const key=$('privateKey')?.value.trim();
-    if(!key){$('memoryHealthStatus').textContent='Enter the private access key first.';return;}
+    if(!key && !(typeof signedIn !== 'undefined' && signedIn)){$('memoryHealthStatus').textContent='Sign in to check your workspace.';return;}
     $('memoryHealthRun').disabled=true;
     $('memoryHealthStatus').textContent='Testing persistent storage and neural inference...';
     try {
-      const r=await fetch('/api/intelligence/memory-health',{headers:{'X-GrowthLens-Key':key}});
+      const r=await fetch('/api/intelligence/memory-health',{headers:{...(key ? {'X-GrowthLens-Key':key} : {})}});
       const d=await r.json();
       if(!r.ok)throw Error(d.detail||'Connection test failed');
       $('memoryHealthStatus').textContent=d.status==='fully_connected'
@@ -81,14 +81,15 @@
   };
   // Check in the background when the access key is available.
   let lastHealthKey='';
-  const autoHealth=()=>{const key=$('privateKey')?.value.trim();if(key && key!==lastHealthKey){lastHealthKey=key;$('memoryHealthRun').click();}};
+  const autoHealth=()=>{const key=$('privateKey')?.value.trim();const identity=key || (typeof signedIn !== 'undefined' && signedIn ? 'browser-session' : '');if(identity && identity!==lastHealthKey){lastHealthKey=identity;$('memoryHealthRun').click();}};
   $('privateKey')?.addEventListener('change',autoHealth);
+  window.addEventListener('growthlens-session', autoHealth);
   setInterval(()=>{lastHealthKey='';autoHealth();},30*60*1000);
   autoHealth();
   const intelGet=async path=>{
     const key=$('privateKey')?.value.trim(),website=$('url')?.value.trim();
-    if(!key||!website)throw Error('Enter the access key and website first.');
-    const res=await fetch(path+(path.includes('?')?'&':'?')+'website='+encodeURIComponent(website),{headers:{'X-GrowthLens-Key':key}});
+    if((!key && !(typeof signedIn !== 'undefined' && signedIn))||!website)throw Error('Sign in and enter a website first.');
+    const res=await fetch(path+(path.includes('?')?'&':'?')+'website='+encodeURIComponent(website),{headers:{...(key ? {'X-GrowthLens-Key':key} : {})}});
     const data=await res.json();if(!res.ok)throw Error(data.detail||'Request failed');return data;
   };
   // Human-readable results only. Evidence is persisted server-side automatically.
@@ -136,12 +137,12 @@
 
   $('publicIntelRun').onclick = async () => {
     const key=$('privateKey')?.value.trim(), url=$('url')?.value.trim(), cik=$('publicCik').value.trim();
-    if (!key || !url) { $('publicIntelStatus').textContent='Enter your access key and website URL first.'; return; }
+    if ((!key && !(typeof signedIn !== 'undefined' && signedIn)) || !url) { $('publicIntelStatus').textContent='Sign in and enter a website URL first.'; return; }
     $('publicIntelRun').disabled=true;
     $('publicIntelStatus').textContent='Querying independent public-data providers concurrently...';
     try {
       const response=await fetch('/api/intelligence-team',{method:'POST',
-        headers:{'Content-Type':'application/json','X-GrowthLens-Key':key},
+        headers:{'Content-Type':'application/json',...(key ? {'X-GrowthLens-Key':key} : {})},
         body:JSON.stringify({url,cik:cik||null,radius_miles:selectedRadius(),business_address:$('localAddress').value.trim()||null,industry:$('publicIndustry').value||null})});
       const data=await response.json();
       if (!response.ok) throw Error(data.detail||'Public intelligence request failed');
