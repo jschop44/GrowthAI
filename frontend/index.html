@@ -461,11 +461,11 @@ footer img{display:block}
       <p class="muted small">Your private beta access key unlocks audits, recommendations and saved history.</p>
       <label for="privateKey">Access key</label>
       <input id="privateKey" type="password" autocomplete="off" placeholder="Enter your access key">
-      <button id="feedbackReadinessButton" type="button">Check LeadFlow connection</button>
+      <button id="feedbackReadinessButton" type="button" hidden>Check LeadFlow connection</button>
       <p id="feedbackReadinessStatus" class="muted small" role="status" aria-live="polite">Checks shared feedback authorization and durable storage without writing data.</p>
       <details id="leadflowRecentPanel">
         <summary>Recent businesses from LeadFlow</summary>
-        <button type="button" id="loadLeadFlowRecent">Refresh LeadFlow searches</button>
+        <button type="button" id="loadLeadFlowRecent" hidden>Refresh LeadFlow searches</button>
         <p id="leadflowRecentStatus" class="muted small" role="status" aria-live="polite">Select a business to prepare a Growth Lens audit.</p>
         <div id="leadflowRecentList"></div>
       </details>
@@ -707,6 +707,8 @@ $("feedbackReadinessButton").onclick = async () => {
     button.disabled = false;
   }
 };
+
+$("privateKey").addEventListener("change",()=>{if($("privateKey").value.trim())$("feedbackReadinessButton").click();});
 
 function reportDate(raw) {
   const d = raw ? new Date(raw) : new Date();
