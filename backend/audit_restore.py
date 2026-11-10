@@ -7,6 +7,27 @@ SOURCE='https://growthlens-free-test.onrender.com'
 COLUMNS=('id','organization_id','url','created_at','status','score','result_json','error')
 
 
+def restore_failure_code(exc):
+    """Classify provider failures without returning credentials or report data."""
+    message=str(exc).lower()
+    conditions=(
+        ('quota_exceeded', ('quota', 'compute time', 'data transfer limit')),
+        ('database_suspended', ('endpoint is disabled', 'endpoint has been disabled', 'project is suspended')),
+        ('authentication_failed', ('password authentication failed', 'authentication failed', 'invalid password')),
+        ('database_missing', ('database', 'does not exist')),
+        ('dns_failed', ('could not translate host', 'name or service not known', 'failed to resolve')),
+        ('connection_timeout', ('timeout expired', 'timed out', 'connection timeout')),
+        ('tls_failed', ('certificate verify failed', 'ssl error', 'ssl connection', 'channel binding')),
+        ('connection_refused', ('connection refused',)),
+        ('permission_denied', ('permission denied', 'insufficient privilege')),
+    )
+    for code,terms in conditions:
+        matched=all(term in message for term in terms) if code=='database_missing' else any(term in message for term in terms)
+        if matched:return code
+    if 'target identifier already contains different data' in message:return 'report_id_conflict'
+    return 'unclassified_restore_failure'
+
+
 def validate_snapshot(snapshot):
     if not isinstance(snapshot,dict) or snapshot.get('version')!=1 or snapshot.get('source')!=SOURCE:
         raise ValueError('Unsupported audit snapshot')
