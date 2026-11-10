@@ -11,6 +11,8 @@ def restore_failure_code(exc):
     """Classify provider failures without returning credentials or report data."""
     message=str(exc).lower()
     conditions=(
+        ('unsupported_startup_parameter', ('unsupported startup parameter', 'unsupported connection parameter')),
+        ('connection_closed', ('closed the connection', 'connection closed', 'unexpected eof', 'ssl syscall')),
         ('quota_exceeded', ('quota', 'compute time', 'data transfer limit')),
         ('database_suspended', ('endpoint is disabled', 'endpoint has been disabled', 'project is suspended')),
         ('authentication_failed', ('password authentication failed', 'authentication failed', 'invalid password')),

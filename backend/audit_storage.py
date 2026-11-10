@@ -76,7 +76,10 @@ def postgres_database():
     # Transaction context commits successful work and rolls back every exception.
     # Never fall back to ephemeral SQLite after a PostgreSQL failure.
     with psycopg.connect(database_url(), connect_timeout=5, row_factory=dict_row,
-                         options='-c statement_timeout=10000', application_name='growthlens-audits') as raw:
+                         application_name='growthlens-audits') as raw:
+        # Transaction poolers can reject libpq's startup `options` parameter.
+        # Keep the timeout transaction-local instead of changing pooled session state.
+        raw.execute('SET LOCAL statement_timeout = 10000')
         yield AuditConnection(raw)
 
 
