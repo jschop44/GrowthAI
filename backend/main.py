@@ -2,6 +2,7 @@
 Not an AI, social-platform, or competitor-data integration.
 """
 from backend.lighthouse_metrics import lighthouse_params, parse_lighthouse
+from backend import audit_storage
 import hmac
 import threading
 import ipaddress
@@ -52,6 +53,10 @@ app.add_middleware(CORSMiddleware, allow_origins=['http://localhost:8000','http:
 
 @contextmanager
 def database():
+    if audit_storage.storage_mode()=='postgres':
+        with audit_storage.postgres_database() as connection:
+            yield connection
+        return
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
     try:
@@ -61,6 +66,9 @@ def database():
         conn.close()
 
 def init_db():
+    if audit_storage.storage_mode()=='postgres':
+        audit_storage.initialize_postgres()
+        return
     with database() as conn:
         conn.executescript('''
         CREATE TABLE IF NOT EXISTS organizations (id INTEGER PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL);
@@ -674,7 +682,7 @@ def homepage():
 
 @app.get('/api/health')
 def health():
-    return {'status':'ok','release':os.environ.get('APP_COMMIT_SHA'),'version':'1.1.0','ai_enabled':bool(os.environ.get('GEMINI_API_KEY')),'pagespeed_enabled':True,'knowledge_base':{'enabled':os.environ.get('KNOWLEDGE_BASE_ENABLED')=='true','mode':'opted-in' if os.environ.get('KNOWLEDGE_BASE_ENABLED')=='true' else 'disabled-until-explicit-opt-in'}}
+    return {'status':'ok','release':os.environ.get('APP_COMMIT_SHA'),'audit_storage':{'backend':audit_storage.storage_mode(),'durable':audit_storage.storage_mode()=='postgres'},'version':'1.1.0','ai_enabled':bool(os.environ.get('GEMINI_API_KEY')),'pagespeed_enabled':True,'knowledge_base':{'enabled':os.environ.get('KNOWLEDGE_BASE_ENABLED')=='true','mode':'opted-in' if os.environ.get('KNOWLEDGE_BASE_ENABLED')=='true' else 'disabled-until-explicit-opt-in'}}
 
 @app.post('/api/audits')
 def create_audit(body: AuditRequest):

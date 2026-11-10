@@ -12,6 +12,20 @@ jobs:
   test:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
+    services:
+      audit-postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: growthlens_storage_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d growthlens_storage_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -24,6 +38,10 @@ jobs:
       - run: python -m pip install --upgrade pip==26.3 && python -m pip install -r requirements.txt
       - name: Python regression suite
         run: PYTHONPATH=. python -m pytest -ra -vv tests
+      - name: Verify durable audit storage against disposable PostgreSQL
+        env:
+          GROWTHLENS_AUDIT_TEST_DSN: postgresql://postgres:ci-only@127.0.0.1:5432/growthlens_storage_test
+        run: python -m pytest -q tests/test_postgres_audit_storage.py
       - run: python -m compileall -q backend
       - run: node --check frontend/local-competition.js
       - run: node --check frontend/local-premium.js
