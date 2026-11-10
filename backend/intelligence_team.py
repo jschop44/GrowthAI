@@ -137,6 +137,8 @@ def run_team(url, address, radius, cik, validate_url, fetch_public, robots_allow
                 summary["score"] = (result.get("audit") or {}).get("score")
             else:
                 summary["performance_score"] = result.get("performance_score")
+                summary["category_scores"] = result.get("category_scores")
+                summary["lab_metrics"] = result.get("metrics")
                 summary["company_name"] = result.get("company_name")
                 summary["metrics_p75"] = result.get("metrics_p75")
             memory_records.append(learning_engine.store(url, engine_name, summary))

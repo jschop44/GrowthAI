@@ -1,6 +1,7 @@
 """GrowthLens: real public-site audit, deterministic scoring, SQLite persistence.
 Not an AI, social-platform, or competitor-data integration.
 """
+from backend.lighthouse_metrics import lighthouse_params, parse_lighthouse
 import hmac
 import threading
 import ipaddress
@@ -572,28 +573,15 @@ def collect_third_party_intelligence(client,url):
                                   'matches':[],'note':'Directory entries are unverified suggestions, not ownership proof.'}}
     try:
         response=client.get('https://www.googleapis.com/pagespeedonline/v5/runPagespeed',
-            params={'url':url,'strategy':'mobile','category':'performance'},
+            params=lighthouse_params(url,'mobile'),
             headers={'Accept':'application/json','User-Agent':AGENT},timeout=6)
         if response.status_code==200:
             payload=response.json()
-            audits=(payload.get('lighthouseResult') or {}).get('audits') or {}
-            categories=(payload.get('lighthouseResult') or {}).get('categories') or {}
-            score=(categories.get('performance') or {}).get('score')
-            metrics={}
-            for metric,key in [('first_contentful_paint_ms','first-contentful-paint'),
-                               ('largest_contentful_paint_ms','largest-contentful-paint'),
-                               ('total_blocking_time_ms','total-blocking-time'),
-                               ('cumulative_layout_shift','cumulative-layout-shift'),
-                               ('speed_index_ms','speed-index')]:
-                value=(audits.get(key) or {}).get('numericValue')
-                if isinstance(value,(int,float)) and not isinstance(value,bool):
-                    metrics[metric]=round(value,3)
-            if isinstance(score,(int,float)):
-                metrics['lighthouse_performance_score']=round(score*100)
-            if metrics:
+            measured=parse_lighthouse(payload)
+            if measured['measurement_status']=='measured':
                 result['performance']={'status':'measured_by_third_party',
                     'source':'Google PageSpeed Insights API / Lighthouse mobile',
-                    'metrics':metrics,'note':'Third-party lab measurements; not first-party site crawl or actual user conversions.'}
+                    **measured,'note':'Automated rendered lab checks; actual-user outcomes and revenue were not measured.'}
         else:
             result['performance']['note']='PageSpeed API unavailable (HTTP '+str(response.status_code)+'); no performance score inferred.'
     except (httpx.HTTPError,ValueError,TypeError,KeyError):
@@ -819,12 +807,13 @@ def pagespeed(audit_id:int, strategy:str='mobile'):
         raise HTTPException(404,'Completed audit not found')
     try:
         with httpx.Client(timeout=65,trust_env=False) as client:
-            r=client.get('https://www.googleapis.com/pagespeedonline/v5/runPagespeed',params={**{'url':row['url'],'strategy':strategy,'category':'performance'},**({'key':key} if key else {})})
+            r=client.get('https://www.googleapis.com/pagespeedonline/v5/runPagespeed',params=lighthouse_params(row['url'],strategy,key))
             r.raise_for_status()
             data=r.json()
-        categories=data['lighthouseResult']['categories']
+        measured=parse_lighthouse(data)
+        if measured['measurement_status']=='unavailable':raise ValueError('Measurements unavailable')
         audits=data['lighthouseResult']['audits']
-        return {'audit_id':audit_id,'strategy':strategy,'performance_score':round(categories['performance']['score']*100),'largest_contentful_paint':audits.get('largest-contentful-paint',{}).get('displayValue'),'cumulative_layout_shift':audits.get('cumulative-layout-shift',{}).get('displayValue'),'source':'Google PageSpeed Insights API','note':'Lab measurements; not a revenue estimate.'}
+        return {'audit_id':audit_id,'strategy':strategy,**measured,'performance_score':measured['category_scores'].get('performance'),'largest_contentful_paint':audits.get('largest-contentful-paint',{}).get('displayValue'),'cumulative_layout_shift':audits.get('cumulative-layout-shift',{}).get('displayValue'),'source':'Google PageSpeed Insights API','note':'Lab measurements; not a revenue estimate.'}
     except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
         raise HTTPException(502,'PageSpeed request failed or returned incomplete data.') 
 from backend.local_competition import register_local_routes

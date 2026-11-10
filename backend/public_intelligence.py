@@ -1,4 +1,5 @@
 """Independent public-data intelligence workers. No target-site crawling."""
+from backend.lighthouse_metrics import lighthouse_params, parse_lighthouse
 from backend.provider_execution import submit_provider
 import sqlite3
 from datetime import datetime, timezone
@@ -14,7 +15,7 @@ class PublicIntelRequest(BaseModel):
     cik: str | None = Field(default=None, max_length=10)
 
 def pagespeed_worker(url, strategy):
-    params = {"url": url, "strategy": strategy, "category": "performance"}
+    params = lighthouse_params(url, strategy)
     key = os.getenv("GOOGLE_PAGESPEED_API_KEY", "").strip()
     if key:
         params["key"] = key
@@ -23,17 +24,16 @@ def pagespeed_worker(url, strategy):
             response = client.get("https://www.googleapis.com/pagespeedonline/v5/runPagespeed", params=params)
             response.raise_for_status()
             payload = response.json()
-        lighthouse = payload.get("lighthouseResult") or {}
-        category = (lighthouse.get("categories") or {}).get("performance") or {}
+        lighthouse = (payload.get("lighthouseResult") or {}) if isinstance(payload, dict) else {}
+        measured = parse_lighthouse(payload)
+        if measured['measurement_status'] == 'unavailable':
+            return {"status": "unavailable", "reason": "No valid Lighthouse measurements returned", "source": "Google PageSpeed Insights"}
         audits = lighthouse.get("audits") or {}
-        score = category.get("score")
-        if score is None:
-            return {"status": "unavailable", "reason": "No Lighthouse performance result", "source": "Google PageSpeed Insights"}
         return {"status": "available", "source": "Google PageSpeed Insights",
-                "strategy": strategy, "performance_score": round(float(score) * 100),
+                "strategy": strategy, **measured, "performance_score": measured["category_scores"].get("performance"),
                 "largest_contentful_paint": (audits.get("largest-contentful-paint") or {}).get("displayValue"),
                 "cumulative_layout_shift": (audits.get("cumulative-layout-shift") or {}).get("displayValue"),
-                "scope": "Third-party lab measurement, not a direct GrowthLens crawl",
+                "scope": measured["scope"],
                 "evidence_url": "https://pagespeed.web.dev/analysis?url=" + __import__("urllib.parse", fromlist=["quote"]).quote(url, safe="")}
     except (httpx.HTTPError, ValueError, TypeError, KeyError):
         return {"status": "unavailable", "source": "Google PageSpeed Insights", "reason": "Provider failed, throttled, or returned incomplete data"}

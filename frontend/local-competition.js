@@ -160,6 +160,13 @@
           const link=document.createElement('a');link.href=result.evidence_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=' · Source';paragraph.append(link);
         }
         $('publicIntelOutput').append(paragraph);
+        if(result.category_scores&&Object.keys(result.category_scores).length){
+          const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Rendered lab measurements';details.append(summary);
+          const list=document.createElement('ul');
+          for(const [category,score] of Object.entries(result.category_scores)){const row=document.createElement('li');row.textContent=category.replaceAll('-',' ')+' score: '+score+'/100';list.append(row);}
+          for(const diagnostic of result.diagnostics||[]){const row=document.createElement('li');row.textContent=diagnostic.name+': '+diagnostic.status.replaceAll('_',' ')+(diagnostic.affected_items!=null?' ('+diagnostic.affected_items+' reported items)':'');list.append(row);}
+          details.append(list);const scope=document.createElement('p');scope.className='muted small';scope.textContent=result.scope||'Automated lab measurements; no real-user or revenue claim.';details.append(scope);$('publicIntelOutput').append(details);
+        }
       }
       const discovery=data.engines?.discovery||{};
       const rivals=Array.isArray(discovery.competitors)?discovery.competitors:[];
