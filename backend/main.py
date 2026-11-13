@@ -2,6 +2,7 @@
 Not an AI, social-platform, or competitor-data integration.
 """
 from backend.lighthouse_metrics import lighthouse_params, parse_lighthouse
+from backend.quality_metrics import substantive_images
 from backend import audit_storage
 import hmac
 import threading
@@ -368,17 +369,7 @@ def analyze_html(html, url, elapsed_ms):
     h1s = [h.get_text(' ',strip=True) for h in soup.find_all('h1')]
     viewport = bool(soup.find('meta', attrs={'name':re.compile('^viewport$', re.I)}))
     canonical = soup.find('link', rel=lambda value: value and 'canonical' in value)
-    def substantive_image(img):
-        # Tiny tracking assets and the observed Akamai beacon are not business
-        # photography or informative images requiring alternative text.
-        source = str(img.get('src') or '')
-        if re.search(r'/akam/\d+/pixel_', urlparse(urljoin(url, source)).path, re.I):
-            return False
-        width, height = str(img.get('width') or '').strip(), str(img.get('height') or '').strip()
-        if width.isdigit() and height.isdigit() and 0 < int(width) <= 2 and 0 < int(height) <= 2:
-            return False
-        return True
-    imgs = [img for img in soup.find_all('img') if substantive_image(img)]
+    imgs = substantive_images(soup, url)
     missing_alt = sum(1 for img in imgs if not img.has_attr('alt'))
     structured = len(soup.find_all('script', type='application/ld+json'))
     links = [urljoin(url, a['href']) for a in soup.find_all('a',href=True)]
