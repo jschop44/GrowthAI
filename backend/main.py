@@ -123,7 +123,19 @@ def _business_candidates(query, client):
         haystack=re.sub(r'[^a-z0-9]+',' ',str(name)+' '+str(address)+' '+host).lower()
         words=set(haystack.split())
         compact=re.sub(r'[^a-z0-9]','',haystack)
-        return bool(query_tokens) and any(t in words or t in compact for t in query_tokens)
+        matches=[token for token in query_tokens if token in words or token in compact]
+        if not matches:
+            return False
+        if len(query_tokens)==1:
+            return True
+        # A single short word from a multi-word business name (e.g. Best)
+        # must not make an unrelated business a viable official-site candidate.
+        if len(matches)>=2:
+            return True
+        # Preserve name-plus-city searches when the distinctive company name
+        # alone appears in its domain (e.g. Tamberinos Baltimore).
+        domain_compact=re.sub(r'[^a-z0-9]','',host)
+        return len(matches[0])>=6 and matches[0] in domain_compact
     def add(name,address,website,source):
         if not website or not isinstance(website,str):
             return
