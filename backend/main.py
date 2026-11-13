@@ -345,6 +345,11 @@ def fetch_public(client, url):
 
 def analyze_html(html, url, elapsed_ms):
     soup = BeautifulSoup(html, 'html.parser')
+    # A successful HTML response can still be an exit/challenge document.
+    # Never score its metadata as evidence about the requested business.
+    prominent = [node.get_text(' ', strip=True) for node in soup.select('title, h1, h2, h3')]
+    if any(re.search(r"^(?:you(?: are|'re) (?:now )?leaving\b|leaving (?:the )?(?:disney|this (?:site|website))\b|access denied\b|verify (?:you are human|your browser)\b|redirecting(?:\s|\.{1,3}|$))", text, re.I) for text in prominent):
+        raise ValueError('Retrieved an exit, redirect or access-verification page; substantive business content was not inspected. No audit score was assigned.')
     title = soup.title.get_text(' ',strip=True) if soup.title else ''
     description_tag = soup.find('meta', attrs={'name': re.compile('^description$', re.I)})
     description = (description_tag.get('content','').strip() if description_tag else '')
