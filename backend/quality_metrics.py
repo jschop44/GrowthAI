@@ -1,5 +1,6 @@
 """Deterministic page diagnostics. HTML signals are not visual or lab measurements."""
 import json
+import re
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
@@ -13,8 +14,22 @@ def recommendation_order(finding):
             finding.get('priority') != 'high', -finding.get('weight', 0))
 
 
+def substantive_images(soup, url):
+    """Exclude known source tracking pixels from substantive image diagnostics."""
+    images = []
+    for img in soup.find_all('img'):
+        source = str(img.get('src') or '')
+        if re.search(r'/akam/\d+/pixel_', urlparse(urljoin(url, source)).path, re.I):
+            continue
+        width, height = str(img.get('width') or '').strip(), str(img.get('height') or '').strip()
+        if width.isdigit() and height.isdigit() and 0 < int(width) <= 2 and 0 < int(height) <= 2:
+            continue
+        images.append(img)
+    return images
+
+
 def enrich_quality(result, soup, html, url):
-    images = soup.find_all('img')
+    images = substantive_images(soup, url)
     scripts = soup.find_all('script', src=True)
     forms = soup.find_all('form')
     missing_dimensions = sum(not (str(x.get('width', '')).isdigit() and str(x.get('height', '')).isdigit() and int(x['width']) > 0 and int(x['height']) > 0) for x in images)
