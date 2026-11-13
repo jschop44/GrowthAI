@@ -115,7 +115,7 @@ footer {
 
   header, footer, main > h1, main > p,
   main > .grid, main > .card:not(#results),
-  #aiButton, #speedButton, #printButton,
+  #aiButton, #speedButton, #independentButton, #independentResults, #printButton,
   #extras, #results > .muted.small {
     display: none !important;
   }
@@ -535,6 +535,8 @@ main{padding-top:46px}.gl-hero h1{letter-spacing:-.055em;line-height:1.1}.gl-eye
       Check Mobile PageSpeed
     </button>
 
+    <button id="independentButton" type="button">Check security &amp; HTML quality</button>
+    <div id="independentResults" class="muted no-print" role="status" aria-live="polite"></div>
     <div id="extras" class="muted"></div>
     <section id="knowledgeEvidencePanel" class="no-print" aria-label="Knowledge evidence">
       <h3>Shared business knowledge</h3>
@@ -823,6 +825,8 @@ function render(data, createdAt = null) {
   $("aiButton").disabled=isPublicFallback;
   $("aiButton").title=isPublicFallback?"Full page audit required for generated explanations":"";
   $("speedButton").disabled=false;
+  $("independentButton").disabled=false;
+  $("independentResults").textContent="";
   if (isPublicFallback) {
     $("status").textContent=data.robots_status==="disallowed"
       ?"Website crawling is prohibited by robots.txt. Showing permitted public metadata instead."
@@ -1092,6 +1096,29 @@ $("knowledgeEvidenceButton").onclick = async () => {
       target.append(article);
     }
   } catch (error) { target.textContent = "Knowledge evidence unavailable: " + error.message; }
+};
+
+$("independentButton").onclick = async () => {
+  const target=$("independentResults"),button=$("independentButton");
+  const website=activeAuditUrl||$("url").value.trim();
+  if(!website){target.textContent="Enter a public website before checking security or markup.";return}
+  button.disabled=true;
+  target.textContent="Checking public website security headers with MDN Observatory and HTML markup with W3C…";
+  try{
+    const data=await api("/api/website-checks",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({url:website})
+    });
+    const security=data.engines?.http_security||{},markup=data.engines?.html_markup||{};
+    const securityText=security.status==="available"
+      ? "HTTP security grade: "+security.grade+" (MDN score "+security.score+"). Tests passed: "+(security.tests_passed??"N/A")+", failed: "+(security.tests_failed??"N/A")+"."
+      : "Security grade unavailable: "+(security.reason||"No measured grade");
+    const markupText=markup.status==="available"
+      ? "W3C HTML Checker: "+markup.markup_errors+" errors; "+markup.markup_warnings+" warnings. "+(markup.sample_messages||[]).slice(0,3).map(x=>x.message).join(" | ")
+      : "HTML validation unavailable: "+(markup.reason||"No verified response");
+    target.textContent=securityText+"\n"+markupText+"\nThese are independent checks, not the GrowthLens business score or a security certification.";
+  }catch(error){target.textContent="Independent checks unavailable: "+error.message}
+  finally{button.disabled=false}
 };
 
 $("speedButton").onclick = () => {
