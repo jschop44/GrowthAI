@@ -2,6 +2,7 @@
 Not an AI, social-platform, or competitor-data integration.
 """
 from backend.lighthouse_metrics import lighthouse_params, parse_lighthouse
+from backend.quality_metrics import substantive_images
 from backend import audit_storage
 import hmac
 import threading
@@ -368,7 +369,7 @@ def analyze_html(html, url, elapsed_ms):
     h1s = [h.get_text(' ',strip=True) for h in soup.find_all('h1')]
     viewport = bool(soup.find('meta', attrs={'name':re.compile('^viewport$', re.I)}))
     canonical = soup.find('link', rel=lambda value: value and 'canonical' in value)
-    imgs = soup.find_all('img')
+    imgs = substantive_images(soup, url)
     missing_alt = sum(1 for img in imgs if not img.has_attr('alt'))
     structured = len(soup.find_all('script', type='application/ld+json'))
     links = [urljoin(url, a['href']) for a in soup.find_all('a',href=True)]
