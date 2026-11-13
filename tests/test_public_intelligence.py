@@ -7,6 +7,8 @@ def test_parallel_results_and_source_accountability(monkeypatch):
     monkeypatch.setattr(intel.evidence_registry, "put", lambda subject, engine, result: True)
     monkeypatch.setattr(intel, "pagespeed_worker", lambda url, strategy: {"status": "available" if strategy == "mobile" else "unavailable", "source": "Google PageSpeed Insights"})
     monkeypatch.setattr(intel, "sec_worker", lambda cik: {"status": "not_requested", "source": "SEC EDGAR"})
+    monkeypatch.setattr(intel, "observatory_worker", lambda url: {"status": "unavailable", "source": "MDN HTTP Observatory"})
+    monkeypatch.setattr(intel, "html_checker_worker", lambda url: {"status": "unavailable", "source": "W3C Nu HTML Checker"})
     result = run_public_intelligence("https://example.com")
     assert result["verified_sources"] == ["pagespeed_mobile"]
     assert result["engines"]["pagespeed_desktop"]["status"] == "unavailable"
