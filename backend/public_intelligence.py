@@ -1,5 +1,6 @@
 """Independent public-data intelligence workers. No target-site crawling."""
 from backend.lighthouse_metrics import lighthouse_params, parse_lighthouse
+from backend.independent_checks import observatory_worker, html_checker_worker
 from backend.provider_execution import submit_provider
 import sqlite3
 from datetime import datetime, timezone
@@ -91,7 +92,9 @@ def run_public_intelligence(url, cik=None):
             "pagespeed_desktop": (pagespeed_worker, (url, "desktop")),
             "corporate_filings": (sec_worker, (cik,)),
             "crux_mobile": (crux_worker, (url, "PHONE")),
-            "crux_desktop": (crux_worker, (url, "DESKTOP"))}
+            "crux_desktop": (crux_worker, (url, "DESKTOP")),
+            "http_security": (observatory_worker, (url,)),
+            "html_markup": (html_checker_worker, (url,))}
     results = {}
     pending = {}
     cache_hits = []
@@ -133,7 +136,8 @@ def run_public_intelligence(url, cik=None):
             "limitations": ["No blocked website was crawled or bypassed.",
                             "Provider failures do not imply a website has poor performance.",
                             "SEC data is returned only for an explicitly supplied company CIK.",
-                            "No financial projections or unverified competitor facts are inferred."]}
+                            "No financial projections or unverified competitor facts are inferred.",
+                            "HTTP Observatory is not penetration testing and HTML Checker is not accessibility certification."]}
 
 def register_public_intelligence(app, validate_url):
     router = APIRouter()
