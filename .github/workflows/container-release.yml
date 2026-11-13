@@ -71,3 +71,34 @@ jobs:
           digest=$(docker image inspect "$IMAGE:sha-$SOURCE_SHA" --format '{{index .RepoDigests 0}}')
           printf 'Verified image: `%s`\nSource revision: `%s`\nContainer health and authorization passed. This does not mean Render has deployed it.\n' "$digest" "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
           docker logout ghcr.io
+      - name: Deploy immutable verified image to Render when hook is configured
+        env:
+          RENDER_HOOK: ${{ secrets.GROWTHLENS_RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_HOOK" ]; then
+            printf 'Render deployment not configured: add GROWTHLENS_RENDER_DEPLOY_HOOK as a GitHub Actions secret. Published image is not live yet.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python3 - <<'PYCODE'
+          import os,urllib.parse,urllib.request
+          sha=os.environ["SOURCE_SHA"]
+          assert len(sha)==40 and all(c in "0123456789abcdef" for c in sha), "Unexpected release SHA"
+          image=os.environ["IMAGE"]+":sha-"+sha
+          hook=urllib.parse.urlsplit(os.environ["RENDER_HOOK"])
+          if hook.scheme!="https" or hook.hostname!="api.render.com" or hook.username or hook.password or not hook.path.startswith("/deploy/") or not hook.query:
+              raise ValueError("Render deploy hook must be an official HTTPS API deploy-hook URL")
+          params=[(k,v) for k,v in urllib.parse.parse_qsl(hook.query,keep_blank_values=True) if k!="imgURL"]
+          params.append(("imgURL",image))
+          target=urllib.parse.urlunsplit((hook.scheme,hook.netloc,hook.path,urllib.parse.urlencode(params),""))
+          request=urllib.request.Request(target,method="POST",headers={"User-Agent":"GrowthLens-GitHub-Verified-Release/1.0"})
+          # Never print the signed hook or its URL, even on HTTP errors.
+          try:
+              with urllib.request.urlopen(request,timeout=25) as response:
+                  if response.status not in (200,201,202):
+                      raise RuntimeError("Render refused verified image deployment")
+          except Exception:
+              raise RuntimeError("Render deploy hook failed; inspect Render Events. Verified GHCR image remains available.") from None
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as summary:
+              summary.write("Render accepted deployment request for verified image `"+image+"`. Confirm live /api/health release SHA before claiming production readiness.\n")
+          print("Render accepted immutable verified image deployment request.")
+          PYCODE
