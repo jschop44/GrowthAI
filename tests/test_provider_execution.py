@@ -35,6 +35,8 @@ def test_cache_failure_retains_live_provider_results(monkeypatch):
     monkeypatch.setattr(intel, "pagespeed_worker", lambda *a: {"status": "available", "source": "PageSpeed", "performance_score": 90})
     monkeypatch.setattr(intel, "crux_worker", lambda *a: {"status": "not_configured", "source": "CrUX"})
     monkeypatch.setattr(intel, "sec_worker", lambda *a: {"status": "not_requested", "source": "SEC"})
+    monkeypatch.setattr(intel, "observatory_worker", lambda *a: {"status": "unavailable", "source": "MDN HTTP Observatory"})
+    monkeypatch.setattr(intel, "html_checker_worker", lambda *a: {"status": "unavailable", "source": "W3C Nu HTML Checker"})
     result = intel.run_public_intelligence("https://example.com")
     assert result["engines"]["pagespeed_mobile"]["performance_score"] == 90
     assert result["verified_sources"] == ["pagespeed_mobile", "pagespeed_desktop"]

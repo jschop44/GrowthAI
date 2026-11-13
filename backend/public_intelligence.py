@@ -1,5 +1,6 @@
 """Independent public-data intelligence workers. No target-site crawling."""
 from backend.lighthouse_metrics import lighthouse_params, parse_lighthouse
+from backend.independent_checks import observatory_worker, html_checker_worker
 from backend.provider_execution import submit_provider
 import sqlite3
 from datetime import datetime, timezone
@@ -86,12 +87,16 @@ def sec_worker(cik):
     except (httpx.HTTPError, ValueError, TypeError):
         return {"status": "unavailable", "source": "SEC EDGAR", "reason": "Public filing lookup unavailable"}
 
-def run_public_intelligence(url, cik=None):
+def run_public_intelligence(url, cik=None, checks_only=False):
     jobs = {"pagespeed_mobile": (pagespeed_worker, (url, "mobile")),
             "pagespeed_desktop": (pagespeed_worker, (url, "desktop")),
             "corporate_filings": (sec_worker, (cik,)),
             "crux_mobile": (crux_worker, (url, "PHONE")),
-            "crux_desktop": (crux_worker, (url, "DESKTOP"))}
+            "crux_desktop": (crux_worker, (url, "DESKTOP")),
+            "http_security": (observatory_worker, (url,)),
+            "html_markup": (html_checker_worker, (url,))}
+    if checks_only:
+        jobs = {name: jobs[name] for name in ("http_security", "html_markup")}
     results = {}
     pending = {}
     cache_hits = []
@@ -133,7 +138,8 @@ def run_public_intelligence(url, cik=None):
             "limitations": ["No blocked website was crawled or bypassed.",
                             "Provider failures do not imply a website has poor performance.",
                             "SEC data is returned only for an explicitly supplied company CIK.",
-                            "No financial projections or unverified competitor facts are inferred."]}
+                            "No financial projections or unverified competitor facts are inferred.",
+                            "HTTP Observatory is not penetration testing and HTML Checker is not accessibility certification."]}
 
 def register_public_intelligence(app, validate_url):
     router = APIRouter()
@@ -144,4 +150,12 @@ def register_public_intelligence(app, validate_url):
         except ValueError as exc:
             raise HTTPException(422, str(exc))
         return run_public_intelligence(url, body.cik)
+    @router.post("/api/website-checks")
+    def website_checks(body: PublicIntelRequest):
+        try:
+            url = validate_url(body.url)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+        return run_public_intelligence(url, checks_only=True)
+
     app.include_router(router)
