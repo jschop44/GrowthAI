@@ -372,7 +372,7 @@ def analyze_html(html, url, elapsed_ms):
         # Tiny tracking assets and the observed Akamai beacon are not business
         # photography or informative images requiring alternative text.
         source = str(img.get('src') or '')
-        if re.search(r'/akam/\\d+/pixel_', urlparse(urljoin(url, source)).path, re.I):
+        if re.search(r'/akam/\d+/pixel_', urlparse(urljoin(url, source)).path, re.I):
             return False
         width, height = str(img.get('width') or '').strip(), str(img.get('height') or '').strip()
         if width.isdigit() and height.isdigit() and 0 < int(width) <= 2 and 0 < int(height) <= 2:
