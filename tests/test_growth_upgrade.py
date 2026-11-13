@@ -352,3 +352,19 @@ def test_outcome_submission_does_not_sync_unpersisted_feedback(monkeypatch):
                                           improved=False,source='manual_user_report')
     result=main.intelligence_feedback(body)
     assert result['feedback_sync']['attempted']==0
+
+
+def test_tracking_pixels_do_not_change_business_image_score_or_evidence_counts():
+    html = ('<html lang="en"><head><title>Pixel Phones and Computer Products</title></head>'
+            '<body><h1>Phones</h1><img src="/products/pixel-9.jpg" alt="Google Pixel 9 phone">'
+            '</body></html>')
+    tracked = html.replace('</body>',
+        '<img src="/akam/13/pixel_62c5ef83">'
+        '<img src="/tracking.png" width="1" height="1"></body>')
+    original = analyze_html(html, 'https://retailer.example/', 120)
+    observed = analyze_html(tracked, 'https://retailer.example/', 120)
+    assert original['score'] == observed['score']
+    assert observed['observations']['image_count'] == 1
+    assert observed['observations']['images_missing_alt'] == 0
+    image_alt = next(row for row in observed['findings'] if row['id'] == 'image_alt')
+    assert image_alt['passed'] is True
