@@ -87,7 +87,7 @@ def sec_worker(cik):
     except (httpx.HTTPError, ValueError, TypeError):
         return {"status": "unavailable", "source": "SEC EDGAR", "reason": "Public filing lookup unavailable"}
 
-def run_public_intelligence(url, cik=None):
+def run_public_intelligence(url, cik=None, checks_only=False):
     jobs = {"pagespeed_mobile": (pagespeed_worker, (url, "mobile")),
             "pagespeed_desktop": (pagespeed_worker, (url, "desktop")),
             "corporate_filings": (sec_worker, (cik,)),
@@ -95,6 +95,8 @@ def run_public_intelligence(url, cik=None):
             "crux_desktop": (crux_worker, (url, "DESKTOP")),
             "http_security": (observatory_worker, (url,)),
             "html_markup": (html_checker_worker, (url,))}
+    if checks_only:
+        jobs = {name: jobs[name] for name in ("http_security", "html_markup")}
     results = {}
     pending = {}
     cache_hits = []
@@ -148,4 +150,12 @@ def register_public_intelligence(app, validate_url):
         except ValueError as exc:
             raise HTTPException(422, str(exc))
         return run_public_intelligence(url, body.cik)
+    @router.post("/api/website-checks")
+    def website_checks(body: PublicIntelRequest):
+        try:
+            url = validate_url(body.url)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+        return run_public_intelligence(url, checks_only=True)
+
     app.include_router(router)
