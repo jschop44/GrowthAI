@@ -1,0 +1,65 @@
+name: Verify GrowthLens live Render revision
+on:
+  workflow_run:
+    workflows: ["Publish verified container"]
+    types: [completed]
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/verify_growthlens_release.py
+      - tests/test_live_release.py
+      - .github/workflows/live-release-verification.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/verify_growthlens_release.py
+      - tests/test_live_release.py
+      - .github/workflows/live-release-verification.yml
+permissions:
+  contents: read
+jobs:
+  offline-safety:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regression check without network access or secrets
+        run: |
+          python -m compileall -q scripts/verify_growthlens_release.py
+          python -m pip install --disable-pip-version-check --quiet pytest
+          python -m pytest -q tests/test_live_release.py
+
+  exact-live:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'workflow_run' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Compare actual Render revision and private-route authorization
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXPECTED_SHA="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          python scripts/verify_growthlens_release.py --expected-sha "$EXPECTED_SHA"
+      - name: Preserve nonsecret live deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: growthlens-exact-live-check
+          path: growthlens-live-release.json
+          if-no-files-found: ignore
+          retention-days: 7
