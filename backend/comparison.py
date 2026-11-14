@@ -15,8 +15,20 @@ SIGNALS = {
 
 def observed_features(html, industry, source_url=None):
     soup = BeautifulSoup(html, "html.parser")
-    for element in soup(["script", "style", "noscript"]):
-        element.decompose()
+    # A hidden menu template, disabled modal, screen-reader-excluded component
+    # or CSS display:none placeholder is NOT a homepage feature observed by
+    # a visitor. Exclude such subtrees before inspecting text or link targets.
+    for element in list(soup.find_all(True)):
+        if not getattr(element, "name", None) or element.parent is None:
+            continue
+        if element.name in {"script", "style", "noscript", "template", "svg"}:
+            element.decompose()
+            continue
+        inline_style = re.sub(r"\s+", "", str(element.get("style") or "").lower())
+        if (element.has_attr("hidden") or element.has_attr("inert")
+                or str(element.get("aria-hidden") or "").lower() == "true"
+                or re.search(r"(?:^|;)(?:display:none(?:!important)?|visibility:hidden(?:!important)?)(?:;|$)", inline_style)):
+            element.decompose()
     visible = soup.get_text(" ", strip=True).lower()
     links = " ".join((a.get("href") or "") + " " + a.get_text(" ", strip=True) for a in soup.find_all("a", href=True)).lower()
     haystack = (visible + " " + links)[:80000]
