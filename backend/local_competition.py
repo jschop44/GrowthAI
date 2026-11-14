@@ -206,15 +206,24 @@ def osm_competitors(client, lat, lon, classification, host, radius_miles):
         domain = ((parsed.hostname or '').lower().removeprefix('www.') if parsed else '')
         if domain and domain == host:
             continue
-        dedupe = domain or f"osm:{element.get('type')}:{element.get('id')}"
-        if dedupe in seen:
-            continue
         coords = element.get('center', element)
         try:
-            distance = haversine(lat, lon, float(coords['lat']), float(coords['lon']))
+            place_lat, place_lon = float(coords['lat']), float(coords['lon'])
+            if not (math.isfinite(place_lat) and math.isfinite(place_lon) and -90 <= place_lat <= 90 and -180 <= place_lon <= 180):
+                continue
+            distance = haversine(lat, lon, place_lat, place_lon)
         except (KeyError, ValueError, TypeError):
             continue
         if distance > radius_miles:
+            continue
+        # A franchise may publish one website for many physical locations.
+        # An OSM element, not its shared domain, identifies a premises.
+        osm_type, osm_id = element.get('type'), element.get('id')
+        if osm_type in ('node', 'way', 'relation') and isinstance(osm_id, (int, str)) and str(osm_id).isdigit():
+            dedupe = f"osm:{osm_type}:{osm_id}"
+        else:
+            dedupe = f"place:{str(name).strip().casefold()}:{place_lat:.5f}:{place_lon:.5f}"
+        if dedupe in seen:
             continue
         cuisine = (attrs.get('cuisine') or '').lower()
         # Pizza results: prioritize cuisine=pizza, but do not assume all restaurants serve pizza.
@@ -224,7 +233,7 @@ def osm_competitors(client, lat, lon, classification, host, radius_miles):
         seen.add(dedupe)
         candidates.append({
             'name': str(name)[:120], 'website': website,
-            'distance_miles': round(distance, 1),
+            'distance_miles': round(distance, 1), 'lat': place_lat, 'lon': place_lon,
             'osm_type': element.get('type'), 'osm_id': element.get('id'),
             'match_reason': 'Pizza cuisine/name' if key == 'pizza' else 'Matching OpenStreetMap category',
         })
@@ -272,14 +281,20 @@ def discover_competitors(client, lat, lon, classification, host, radius_miles):
         website=row.get('website')
         hostname = ((urlparse(website).hostname or '').lower().removeprefix('www.') if website else '')
         if hostname and hostname == host: continue
-        identifier = hostname or row.get('provider_id') or name_lower
-        if identifier in seen: continue
-        try: distance = haversine(lat,lon,row['lat'],row['lon'])
+        try:
+            place_lat, place_lon = float(row['lat']), float(row['lon'])
+            if not (math.isfinite(place_lat) and math.isfinite(place_lon) and -90 <= place_lat <= 90 and -180 <= place_lon <= 180):
+                continue
+            distance = haversine(lat,lon,place_lat,place_lon)
         except (KeyError, TypeError, ValueError): continue
         if distance > radius_miles: continue
+        # Provider IDs identify individual places; domains can be shared by a chain.
+        identifier = str(row.get('provider_id') or f"place:{name_lower}:{place_lat:.5f}:{place_lon:.5f}")
+        if identifier in seen: continue
         seen.add(identifier)
         candidates.append({
             'name':name[:120], 'website': website,'distance_miles':round(distance,1),
+            'lat':place_lat,'lon':place_lon,
             'provider':'Geoapify (OpenStreetMap-derived)', 'provider_id':row.get('provider_id'),
             'source_url':row.get('source_url'),
             'match_reason':'Provider category and name-based specialty filter; verify manually',
@@ -294,9 +309,14 @@ def discover_competitors(client, lat, lon, classification, host, radius_miles):
         for existing in merged:
             other_domain = ((urlparse(existing.get('website') or '').hostname or '').lower().removeprefix('www.'))
             other_name = re.sub(r'[^a-z0-9]+', '', existing.get('name','').lower())
-            if (normalized and normalized == other_name and abs(row['distance_miles'] - existing['distance_miles']) <= 0.3):
-                match = existing
-                break
+            # Similar distance from the target is NOT evidence of the same
+            # address: two branches on opposite sides of town can be equidistant.
+            # Reconcile the two OSM-derived providers only for the same named
+            # premises with geographic coordinates within about 80 metres.
+            if normalized and normalized == other_name:
+                if haversine(row['lat'],row['lon'],existing['lat'],existing['lon']) <= 0.05:
+                    match = existing
+                    break
         source = 'Geoapify' if row.get('provider') else 'Overpass'
         if match:
             match['source_providers'] = sorted(set(match['source_providers'] + [source]))
