@@ -24,7 +24,7 @@ def observed_features(html, industry, source_url=None):
         if element.name in {"script", "style", "noscript", "template", "svg"}:
             element.decompose()
             continue
-        inline_style = re.sub(r"\\s+", "", str(element.get("style") or "").lower())
+        inline_style = re.sub(r"\s+", "", str(element.get("style") or "").lower())
         if (element.has_attr("hidden") or element.has_attr("inert")
                 or str(element.get("aria-hidden") or "").lower() == "true"
                 or re.search(r"(?:^|;)(?:display:none(?:!important)?|visibility:hidden(?:!important)?)(?:;|$)", inline_style)):
