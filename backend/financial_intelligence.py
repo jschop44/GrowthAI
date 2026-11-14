@@ -4,6 +4,7 @@ No private-company revenue or observed financial losses are inferred.
 All inputs are illustrative until verified benchmarks are connected.
 """
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 DEFAULTS = {
     "pizza": (900, 26), "restaurant": (650, 45),
@@ -23,12 +24,39 @@ def estimate_opportunities(industry, competitors, feature_gaps):
         }
     results = []
     for gap in feature_gaps[:8]:
-        rivals = gap.get("competitors_with_feature") or []
-        if not rivals:
+        name = gap.get("feature")
+        named_rivals = set(gap.get("competitors_with_feature") or [])
+        # A competitor label in comparison metadata cannot by itself prove
+        # that an audited website exposed this feature. Trace each example to
+        # its own successfully inspected page and corresponding feature claim.
+        sources = []
+        seen_urls = set()
+        for peer in competitors:
+            if not isinstance(peer, dict) or peer.get("status") != "audited" or peer.get("peer_eligible") is not True:
+                continue
+            if peer.get("name") not in named_rivals:
+                continue
+            observed = (peer.get("features") or {}).get(name) or {}
+            url = peer.get("website")
+            evidence_url = observed.get("evidence_url")
+            if observed.get("observed") is not True or not isinstance(url, str) or evidence_url != url:
+                continue
+            try:
+                parsed = urlsplit(url)
+                if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password:
+                    continue
+            except ValueError:
+                continue
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+            sources.append({"competitor": peer["name"], "url": url, "scope": observed.get("scope", "analyzed homepage only")})
+        if not sources:
             continue
         results.append({
-            "feature": gap.get("feature", "Website capability"),
-            "competitor_examples": rivals[:3],
+            "feature": name or "Website capability",
+            "competitor_examples": [source["competitor"] for source in sources[:3]],
+            "evidence_sources": sources[:5],
             "annual_revenue_scenarios": {
                 "conservative": round(visits * ticket * 12 * LIFTS[0]),
                 "baseline": round(visits * ticket * 12 * LIFTS[1]),
@@ -41,10 +69,11 @@ def estimate_opportunities(industry, competitors, feature_gaps):
             },
             "confidence": "very low",
             "classification": "hypothetical scenario, not observed lost revenue",
-            "observed_competitors": len(rivals),
+            "observed_competitors": len(sources),
+            "evidence_scope": "public website homepage observation, not verified business financial data",
         })
     return {
-        "status": "illustrative",
+        "status": "illustrative" if results else "insufficient_evidence",
         "industry": industry,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "opportunities": results,
@@ -53,5 +82,6 @@ def estimate_opportunities(industry, competitors, feature_gaps):
             "Default inputs are illustrative and are not local market benchmarks.",
             "Scenarios can overlap and must not be summed.",
             "A competitor's feature does not establish a causal revenue uplift.",
+            "A numeric scenario is omitted unless an audited, niche-eligible competitor page provides a matching public feature URL.",
         ],
     }
