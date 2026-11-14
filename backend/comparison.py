@@ -1,6 +1,7 @@
 """Evidence-limited, industry-aware comparison of observed homepage features."""
 import re
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
 
 SIGNALS = {
@@ -31,6 +32,38 @@ def observed_features(html, industry, source_url=None):
             "evidence_url": source_url if found else None,
         }
     return output
+
+def website_evidence_key(url):
+    """Identify a single audited homepage; branches remain separate listings.
+
+    Two physical stores using the same exact inspected page are not two
+    independent website-design observations. Distinct location-specific paths
+    and queries remain separate evidence.
+    """
+    if not isinstance(url, str):
+        return None
+    try:
+        parsed = urlsplit(url.strip())
+        if parsed.scheme not in ("https", "http") or not parsed.hostname or parsed.username or parsed.password:
+            return None
+        host = parsed.hostname.lower().removeprefix("www.")
+        return (parsed.scheme, host, parsed.port, parsed.path.rstrip("/") or "/", parsed.query)
+    except ValueError:
+        return None
+
+
+def unique_site_peers(competitors):
+    """Keep one representative per audited URL, without hiding physical branches."""
+    unique, seen = [], set()
+    for competitor in competitors:
+        key = website_evidence_key(competitor.get("website"))
+        if key is not None:
+            if key in seen:
+                continue
+            seen.add(key)
+        unique.append(competitor)
+    return unique
+
 
 def compare_features(target_features, competitors):
     rows = []

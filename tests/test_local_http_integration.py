@@ -44,3 +44,38 @@ def test_invalid_radius_rejected_before_network(monkeypatch):
     monkeypatch.setenv("GROWTHLENS_PRIVATE_KEY", "testing-secret")
     response = TestClient(main.app).post("/api/local-competition",headers={"X-GrowthLens-Key":"testing-secret"},json={"url":"https://target.example","radius_miles":500})
     assert response.status_code == 422
+
+
+def test_franchise_locations_reuse_one_website_audit_and_leave_budget_for_other_peers(monkeypatch):
+    """Keep all physical store rows, but audit shared company pages only once."""
+    from collections import Counter
+    monkeypatch.setenv('GROWTHLENS_PRIVATE_KEY', 'testing-secret')
+    calls = Counter()
+    def fake_fetch(client, website):
+        calls[website] += 1
+        return type('Response', (), {'text': RIVAL if 'rival' in website or 'another' in website else TARGET})(), website
+    branches = [
+        {'name':f'Nearby Roofer branch {i}', 'website':'https://rival.example/',
+         'distance_miles':float(i+1), 'lat':39.5+i*.001, 'lon':-76.3}
+        for i in range(5)
+    ]
+    branches.append({'name':'Another Roofer','website':'https://another.example/',
+                     'distance_miles':7.0,'lat':39.51,'lon':-76.31})
+    monkeypatch.setattr(local, 'geocode', lambda *_: (39.5,-76.3,'structured data'))
+    monkeypatch.setattr(local, 'discover_competitors',lambda *_: (branches,None,'offline test sources'))
+    isolated = FastAPI()
+    local.register_local_routes(isolated,lambda url:url,fake_fetch,lambda *_:True,main.analyze_html)
+    response = TestClient(isolated).post('/api/local-competition',
+                json={'url':'https://target.example/','radius_miles':15})
+    assert response.status_code == 200,response.text
+    report = response.json()
+    assert len(report['competitors']) == 6,'All physical branches must remain in the listing'
+    assert all(c['status']=='audited' for c in report['competitors'])
+    assert calls['https://rival.example/'] == 1,'Shared homepage must not consume five free audits'
+    assert calls['https://another.example/'] == 1,'An independent sixth listing still gets an audit'
+    financing = next(row for row in report['feature_comparison'] if row['feature']=='financing')
+    assert financing['competitors_scanned'] == 2,'Independent website sample must not count chain branches repeatedly'
+    assert len(financing['competitors_with_feature']) == 2
+    contact = next(f for f in report['audit']['findings'] if f['id']=='contact')
+    assert contact['local_peer_comparison']['eligible_listing_count'] >= 2
+    assert contact['local_peer_comparison']['sample_size'] <= 2
