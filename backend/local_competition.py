@@ -383,14 +383,23 @@ def register_local_routes(app, validate_url, fetch_public, robots_allowed, analy
             candidates=[];warning=None;discovery_source='No discovery performed'
             if lat is None: warning='No reliable physical address or coordinates found on the target website. Cannot establish the selected search radius.'
             else: candidates,warning,discovery_source=discover_competitors(client,lat,lon,classification,(urlparse(final).hostname or '').lower().removeprefix('www.'),body.radius_miles)
-            from backend.comparison import observed_features, compare_features
+            from backend.comparison import observed_features, compare_features, unique_site_peers, website_evidence_key
             target_features = observed_features(response.text, classification.get('key'),final)
             competitors=[]
             audited_count = 0
+            site_audits = {}
             for c in candidates:
                 row={**c,'score':None,'status':'not audited','scoring_scope':audit['scoring_scope'],'findings':[]}
                 if not c.get('website'):
                     row['status'] = 'No public website listed by data provider'
+                    competitors.append(row)
+                    continue
+                # Different franchise branches may share one actual homepage.
+                # Keep each physical listing but do not spend scarce audit slots
+                # or repeat network reads for the same inspected URL.
+                site_key = website_evidence_key(c['website'])
+                if site_key is not None and site_key in site_audits:
+                    row.update(site_audits[site_key])
                     competitors.append(row)
                     continue
                 if audited_count >= 5:
@@ -411,15 +420,21 @@ def register_local_routes(app, validate_url, fetch_public, robots_allowed, analy
                         if not row['peer_eligible']:
                             row['peer_exclusion_reason']='Fetched homepage did not corroborate the target business niche with sufficient confidence.'
                 except (httpx.HTTPError,ValueError) as exc: row['status']='unavailable: '+str(exc)[:90]
+                if site_key is not None:
+                    fields=('score','status','findings','website','features','peer_classification',
+                            'peer_eligible','peer_exclusion_reason')
+                    site_audits[site_key]={k:row[k] for k in fields if k in row}
                 competitors.append(row)
         from backend.quality_metrics import local_peer_evidence,recommendation_order
         local_peer_evidence(audit['findings'], competitors, classification.get('key'), body.radius_miles)
         opportunities=[]
         for f in sorted((f for f in audit['findings'] if not f['passed']),key=recommendation_order):
             eligible_urls={source['url'] for source in f['local_peer_comparison']['sources']}
-            rivals=[c['name'] for c in competitors if c.get('website') in eligible_urls and any(x['id']==f['id'] and x['passed'] for x in c['findings'])]
+            rivals=[c['name'] for c in unique_site_peers(competitors) if c.get('website') in eligible_urls and any(x['id']==f['id'] and x['passed'] for x in c['findings'])]
             opportunities.append({'priority':len(opportunities)+1,'issue':f['name'],'recommendation':f['recommendation'],'weight':f['weight'],'local_peer_comparison':f.get('local_peer_comparison'),'cost_savings':f.get('cost_savings'),'competitors_passing_check':rivals,'evidence':'Failed check on target page'+('; passing competitor: '+', '.join(rivals[:3]) if rivals else '')})
-        eligible_peers=[c for c in competitors if c.get('peer_eligible') is True]
+        # Financial feature prevalence is based on distinct audited webpages,
+        # not the number of separate physical branches sharing those pages.
+        eligible_peers=unique_site_peers([c for c in competitors if c.get('peer_eligible') is True])
         comparison = compare_features(target_features, eligible_peers)
         from backend.financial_intelligence import estimate_opportunities
         feature_gaps = [item for item in comparison if not item['target_observed'] and item['competitors_with_feature']]
