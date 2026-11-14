@@ -78,3 +78,23 @@ def test_security_order_survives_negative_user_reported_feedback(monkeypatch):
         {'id': 'contact', 'passed': False}, {'id': 'lead_capture', 'passed': False},
         {'id': 'mixed_content', 'passed': False}, {'id': 'image_dimensions', 'passed': False}]))
     assert result['ranking'][0]['finding_id'] == 'mixed_content'
+
+
+def test_chain_branches_cannot_inflate_independent_website_prevalence():
+    findings = [{'id':'contact','passed':False}]
+    peers = [
+        {'name':'Chain North','website':'https://chain.example/','status':'audited','peer_eligible':True,
+         'distance_miles':2,'findings':[{'id':'contact','passed':True}]},
+        {'name':'Chain South','website':'https://www.chain.example/','status':'audited','peer_eligible':True,
+         'distance_miles':4,'findings':[{'id':'contact','passed':True}]},
+        {'name':'Independent','website':'https://independent.example/','status':'audited','peer_eligible':True,
+         'distance_miles':3,'findings':[{'id':'contact','passed':False}]},
+    ]
+    local_peer_evidence(findings,peers,'roofing',15)
+    result=findings[0]['local_peer_comparison']
+    assert result['eligible_listing_count'] == 3
+    assert result['duplicate_page_listings_excluded'] == 1
+    assert result['sample_size'] == 2
+    assert result['passing_count'] == 1
+    assert len(result['sources']) == 2
+    assert 'not independent' in result['note']
