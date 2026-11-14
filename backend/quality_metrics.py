@@ -106,10 +106,18 @@ def local_peer_evidence(findings, competitors, industry, radius_miles):
                     and isinstance(c.get('distance_miles'), (float, int)) and 0 <= c['distance_miles'] <= radius_miles]
         observations = [(c, next((f for f in c.get('findings', []) if f.get('id') == finding['id'] and isinstance(f.get('passed'), bool)), None)) for c in eligible]
         observations = [(c, f) for c, f in observations if f is not None]
+        # Physical branches remain separately listed, but each distinct
+        # audited URL is only one website-performance observation.
+        from backend.comparison import unique_site_peers
+        findings_by_row = {id(c): f for c, f in observations}
+        independent = unique_site_peers([c for c, _ in observations])
+        observations = [(c, findings_by_row[id(c)]) for c in independent]
         finding['local_peer_comparison'] = {'industry': industry, 'radius_miles': radius_miles,
             'sample_size': len(observations), 'passing_count': sum(f['passed'] for _, f in observations),
+            'eligible_listing_count': len(findings_by_row),
+            'duplicate_page_listings_excluded': len(findings_by_row) - len(observations),
             'sources': [{'name': c.get('name'), 'url': c.get('website'), 'distance_miles': c['distance_miles']} for c, _ in observations],
             'confidence': 'limited_listing_classification',
-            'note': 'Nearby listings were selected by niche; individual business classification and costs are not independently verified.'}
+            'note': 'Each audited URL is counted once; branches sharing one homepage are not independent website evidence. Niche classification and operating costs require independent verification.'}
         finding['cost_savings'] = {'status': 'not_estimated', 'annual_usd': None,
             'reason': 'Peer website features do not reveal staff hours, supplier bills, labor rates or causal cost savings. Verified operating data is required.'}
