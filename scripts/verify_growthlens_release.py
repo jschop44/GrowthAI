@@ -89,11 +89,11 @@ def main():
     if summary:
         with open(summary, "a", encoding="utf-8") as output:
             output.write("### GrowthLens exact Render deployment verification\n\n")
-            output.write("Expected Git commit: \`" + args.expected_sha + "\`\n\n")
-            output.write("Live Render commit: \`" + (result.get("live_sha") or "unavailable") + "\`\n\n")
+            output.write("Expected Git commit: `" + args.expected_sha + "`\n\n")
+            output.write("Live Render commit: `" + (result.get("live_sha") or "unavailable") + "`\n\n")
             output.write("Result: **" + result["outcome"] + "**. Private audits must remain HTTP 401 without an owner key.\n")
             if result["outcome"] == "stale_or_unidentified_render_image":
-                output.write("Render is still pinned to an older image. A plain redeploy of the pinned digest will not upgrade it. Update the image to the verified \`ghcr.io/jschop44/growthai-verified-api:sha-" + args.expected_sha + "\` using the existing official Render deploy hook, then rerun this check.\n")
+                output.write("Render is still pinned to an older image. A plain redeploy of the pinned digest will not upgrade it. Update the image to the verified `ghcr.io/jschop44/growthai-verified-api:sha-" + args.expected_sha + "` using the existing official Render deploy hook, then rerun this check.\n")
     return 0 if result["outcome"] == "verified_live" else 1
 
 
