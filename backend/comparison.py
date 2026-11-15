@@ -22,7 +22,7 @@ def affirmed_feature(text, terms):
             after = text[match.end():match.end() + 48]
             if re.search(r"\b(?:no|not|never|without|don't|doesn't|cannot|can't|unavailable)\b(?:[\s,;:—-]+[\w']+){0,5}[\s:—-]*$", before):
                 continue
-            if re.match(r"^\s*(?:(?:is|are|currently|still|temporarily|now)\s+){0,3}(?:not|unavailable|discontinued|suspended|closed)\b", after):
+            if re.search(r"^(?:[\s,;:—-]+\w+){0,6}[\s:—-]+(?:not|unavailable|discontinued|suspended|closed)\b", after) or re.match(r"^\s*(?:not|unavailable|discontinued|suspended|closed)\b", after):
                 continue
             return True
     return False
