@@ -118,3 +118,37 @@ def test_denied_feature_url_with_negative_label_does_not_claim_availability():
     features = observed_features(page, 'plumber', 'https://plumbing.example/')
     assert features['online booking']['observed'] is False
     assert features['emergency service']['observed'] is False
+
+
+
+def test_external_and_query_only_paths_do_not_claim_competitor_checkout():
+    page = """<main><p>Visit our local bakery.</p>
+      <a href="https://partner.example/order-online">Partner information</a>
+      <a href="/learn-more?next=/order-online">Learn more</a>
+      <a href="/press#order-online">Press coverage</a>
+    </main>"""
+    observed = observed_features(page, "pizza", "https://bakery.example/")
+    assert observed["online ordering"]["observed"] is False
+    assert observed["online ordering"]["evidence_url"] is None
+
+
+def test_visible_first_party_navigation_path_is_evidence_not_a_marketing_query():
+    page = """<main><p>Our local kitchen.</p>
+       <a href="https://www.pizza.example/order-online">Explore services</a>
+       <a href="/menu">Browse our selections</a>
+       <a href="/request?feature=catering">Ask a question</a>
+    </main>"""
+    observed = observed_features(page, "pizza", "https://pizza.example/")
+    assert observed["online ordering"]["observed"] is True
+    assert observed["menu"]["observed"] is True
+    assert observed["catering"]["observed"] is False
+
+
+def test_relative_path_allowed_without_a_known_source_but_external_links_are_not():
+    no_origin = observed_features(
+        '<a href="https://offsite.example/order-online">Partner</a>'
+        '<a href="/order-online">Browse</a>', "pizza")
+    assert no_origin["online ordering"]["observed"] is True
+    outside_only = observed_features(
+        '<a href="https://offsite.example/order-online">Partner</a>', "pizza")
+    assert outside_only["online ordering"]["observed"] is False

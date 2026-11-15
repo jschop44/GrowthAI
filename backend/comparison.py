@@ -28,6 +28,34 @@ def affirmed_feature(text, terms):
     return False
 
 
+def observed_link_path(href, source_url=None):
+    """Only on-site, visible navigation paths can support feature evidence.
+
+    Query strings and third-party links can mention 'order-online' without the
+    audited business offering ordering. Do not turn those into an advantage.
+    """
+    if not isinstance(href, str) or not href.strip():
+        return ""
+    try:
+        link = urlsplit(href.strip())
+        if link.scheme and link.scheme not in ("http", "https"):
+            return ""
+        if link.username or link.password:
+            return ""
+        if link.netloc:
+            if not source_url:
+                return ""
+            source = urlsplit(source_url)
+            if (not source.hostname or
+                link.hostname.lower().removeprefix("www.") != source.hostname.lower().removeprefix("www.")):
+                return ""
+        if not link.path or link.path == "/":
+            return ""
+        return link.path.replace("/", " ").replace("-", " ").replace("_", " ")
+    except ValueError:
+        return ""
+
+
 def observed_features(html, industry, source_url=None):
     soup = BeautifulSoup(html, "html.parser")
     # A hidden menu template, disabled modal, screen-reader-excluded component
@@ -55,7 +83,7 @@ def observed_features(html, industry, source_url=None):
         if not found:
             # Navigation URLs count only when their labels do not disclaim
             # availability; no offsite lookup or feature inference is made.
-            found = any(affirmed_feature(href.replace("/", " ").replace("-", " "), terms)
+            found = any(affirmed_feature(observed_link_path(href, source_url), terms)
                         and not (label and re.search(r"\b(?:no|not|unavailable|disabled|discontinued)\b", label, re.I))
                         for label, href in links)
         output[name] = {
