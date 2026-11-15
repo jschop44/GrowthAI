@@ -152,3 +152,31 @@ def test_relative_path_allowed_without_a_known_source_but_external_links_are_not
     outside_only = observed_features(
         '<a href="https://offsite.example/order-online">Partner</a>', "pizza")
     assert outside_only["online ordering"]["observed"] is False
+
+
+
+def test_planned_or_coming_soon_features_are_not_current_competitor_advantages():
+    from backend.comparison import affirmed_feature
+    assert not affirmed_feature("Order online coming soon.", ("order online",))
+    assert not affirmed_feature("Coming soon: order online.", ("order online",))
+    assert not affirmed_feature("We plan to offer order online later.", ("order online",))
+    assert not affirmed_feature("Financing will launch next month.", ("financing",))
+    assert not affirmed_feature("Reservations launching soon.", ("reservations",))
+    assert affirmed_feature("Order online now and collect at the counter.", ("order online",))
+    assert affirmed_feature("Financing available today.", ("financing",))
+
+
+def test_planned_ordering_does_not_create_a_fake_competitor_website_gap():
+    target=observed_features("<main><h1>Local Pizza</h1></main>","pizza")
+    planned=observed_features(
+        "<main><h1>Coming soon: Order online</h1></main>","pizza","https://planned.example/")
+    operating=observed_features(
+        "<main><a href='/order-online'>Order online now</a></main>","pizza","https://operating.example/")
+    assert planned["online ordering"]["observed"] is False
+    assert operating["online ordering"]["observed"] is True
+    rows=compare_features(target,[
+        {"name":"Announced only","features":planned},
+        {"name":"Operational","features":operating},
+    ])
+    ordering=next(x for x in rows if x["feature"]=="online ordering")
+    assert ordering["competitors_with_feature"]==["Operational"]
