@@ -87,3 +87,34 @@ def test_inline_visibility_is_checked_without_excluding_visible_sibling_text():
     findings = observed_features(page, "pizza")
     assert findings["online ordering"]["observed"] is False
     assert all(findings[name]["observed"] for name in ("catering", "delivery", "menu"))
+
+
+
+def test_explicit_feature_denials_are_not_mistaken_for_competitive_advantages():
+    page = """<main>
+      <p>We do not offer online ordering or delivery.</p>
+      <p>Our catering service is currently unavailable.</p>
+      <p>There is no menu online yet.</p>
+    </main>"""
+    features = observed_features(page, "pizza", "https://pizza.example/")
+    assert all(not item['observed'] for item in features.values())
+    assert all(item['evidence_url'] is None for item in features.values())
+
+
+def test_affirmative_link_survives_negative_different_service():
+    page = """<main><p>We do not offer catering.</p>
+      <a href="/order-online">Order Online</a><a href="/menu">View Menu</a>
+      <p>Delivery currently not available.</p>
+    </main>"""
+    features = observed_features(page, "pizza", "https://pizza.example/")
+    assert features['online ordering']['observed'] is True
+    assert features['menu']['observed'] is True
+    assert features['catering']['observed'] is False
+    assert features['delivery']['observed'] is False
+
+
+def test_denied_feature_url_with_negative_label_does_not_claim_availability():
+    page = '<a href="/book-online">Online booking not available</a><p>We do not offer emergency service.</p>'
+    features = observed_features(page, 'plumber', 'https://plumbing.example/')
+    assert features['online booking']['observed'] is False
+    assert features['emergency service']['observed'] is False
