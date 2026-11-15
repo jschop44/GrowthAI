@@ -28,7 +28,7 @@ def substantive_images(soup, url):
             if node.name in {'template', 'noscript', 'script'} or node.has_attr('hidden'):
                 hidden = True
                 break
-            style = re.sub(r'\\s+', '', str(node.get('style') or '').lower())
+            style = re.sub(r'\s+', '', str(node.get('style') or '').lower())
             if re.search(r'(?:^|;)(?:display:none(?:!important)?|visibility:hidden(?:!important)?)(?:;|$)', style):
                 hidden = True
                 break
