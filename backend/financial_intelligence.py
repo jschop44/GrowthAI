@@ -24,6 +24,16 @@ def estimate_opportunities(industry, competitors, feature_gaps):
         }
     results = []
     for gap in feature_gaps[:8]:
+        if not isinstance(gap, dict):
+            continue
+        # A working feature on the audited business is not a missing-service
+        # opportunity. Explicitly unverified/unknown target evidence cannot
+        # support an opportunity scenario either. Keep compatibility with
+        # older comparisons that omitted target observation entirely.
+        if "target_observed" in gap and gap["target_observed"] is not False:
+            continue
+        if gap.get("target_status") in ("unknown", "unverified", "not_audited"):
+            continue
         name = gap.get("feature")
         named_rivals = set(gap.get("competitors_with_feature") or [])
         # A competitor label in comparison metadata cannot by itself prove
@@ -83,5 +93,6 @@ def estimate_opportunities(industry, competitors, feature_gaps):
             "Scenarios can overlap and must not be summed.",
             "A competitor's feature does not establish a causal revenue uplift.",
             "A numeric scenario is omitted unless an audited, niche-eligible competitor page provides a matching public feature URL.",
+            "An already-observed target feature or explicitly unknown target observation cannot generate a missing-feature scenario.",
         ],
     }

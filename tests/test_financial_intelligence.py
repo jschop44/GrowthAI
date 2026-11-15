@@ -70,3 +70,30 @@ def test_evidence_linked_scenarios_count_independent_websites_not_duplicate_bran
         "https://finance.example/", "https://another.example/"}
     assert item["classification"] == "hypothetical scenario, not observed lost revenue"
     assert "not local market benchmarks" in result["limitations"][1]
+
+
+def test_website_already_has_feature_cannot_generate_a_fictitious_missing_service_scenario():
+    rival = {
+        "name":"Local rival", "status":"audited", "peer_eligible":True,
+        "website":"https://rival.example/",
+        "features":{"financing":{"observed":True,"evidence_url":"https://rival.example/"}},
+    }
+    rows = [
+        {"feature":"financing","target_observed":True,
+         "competitors_with_feature":["Local rival"]},
+        {"feature":"financing","target_observed":None,
+         "target_status":"unknown","competitors_with_feature":["Local rival"]},
+        {"feature":"financing","target_observed":"false",
+         "competitors_with_feature":["Local rival"]},
+    ]
+    assert estimate_opportunities("roofing",[rival],rows)["status"]=="insufficient_evidence"
+    assert estimate_opportunities("roofing",[rival],rows)["opportunities"]==[]
+    actual_gap={"feature":"financing","target_observed":False,
+                "competitors_with_feature":["Local rival"]}
+    scenario=estimate_opportunities("roofing",[rival],[actual_gap])
+    assert scenario["status"]=="illustrative"
+    assert scenario["opportunities"][0]["feature"]=="financing"
+
+
+def test_corrupt_opportunity_rows_cannot_crash_the_audit():
+    assert estimate_opportunities("roofing",[],[None,False,"finance"])["status"]=="insufficient_evidence"
