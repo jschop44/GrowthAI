@@ -133,12 +133,37 @@ def unique_site_peers(competitors):
 
 
 def compare_features(target_features, competitors):
+    """Report observed coverage per feature, not per competitor listing.
+
+    Some discovered peers have a website but no usable homepage feature scan.
+    Counting those as 'scanned' makes the denominator appear better sourced
+    than it is, and silently turns unavailable evidence into false absences.
+    """
     rows = []
     for name, target in target_features.items():
-        observed = [c["name"] for c in competitors if c.get("features", {}).get(name, {}).get("observed") is True]
-        details = [{"name": c.get("name"), "status": ("observed" if (c.get("features") or {}).get(name, {}).get("observed") is True else "not_observed_on_page" if name in (c.get("features") or {}) else "unknown"), "evidence_url": (c.get("features") or {}).get(name, {}).get("evidence_url")} for c in competitors]
-        rows.append({"feature": name, "target_observed": target["observed"], "target_status": target.get("status"), "target_evidence_url": target.get("evidence_url"), "observed_at": target.get("observed_at"), "competitor_details": details,
-                     "competitors_with_feature": observed,
-                     "competitors_scanned": sum(isinstance(c.get("features"), dict) for c in competitors),
-                     "interpretation": "Not observed on homepage is not proof of absence elsewhere."})
+        observed, details, scanned = [], [], 0
+        for competitor in competitors:
+            features = competitor.get("features")
+            feature = features.get(name) if isinstance(features, dict) else None
+            has_evidence = isinstance(feature, dict) and type(feature.get("observed")) is bool
+            if has_evidence:
+                scanned += 1
+            is_observed = has_evidence and feature["observed"] is True
+            if is_observed:
+                observed.append(competitor.get("name"))
+            details.append({
+                "name": competitor.get("name"),
+                "status": ("observed" if is_observed else
+                           "not_observed_on_page" if has_evidence else "unknown"),
+                "evidence_url": feature.get("evidence_url") if has_evidence else None,
+            })
+        rows.append({
+            "feature": name, "target_observed": target["observed"],
+            "target_status": target.get("status"),
+            "target_evidence_url": target.get("evidence_url"),
+            "observed_at": target.get("observed_at"),
+            "competitor_details": details, "competitors_with_feature": observed,
+            "competitors_scanned": scanned,
+            "interpretation": "Not observed on homepage is not proof of absence elsewhere.",
+        })
     return rows
