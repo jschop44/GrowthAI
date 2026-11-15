@@ -24,6 +24,11 @@ def affirmed_feature(text, terms):
                 continue
             if re.search(r"^(?:[\s,;:—-]+\w+){0,6}[\s:—-]+(?:not|unavailable|discontinued|suspended|closed)\b", after) or re.match(r"^\s*(?:not|unavailable|discontinued|suspended|closed)\b", after):
                 continue
+            # Planned services are not current, observed capabilities.
+            if re.search(r"\b(?:coming\s+soon|planning\s+to\s+(?:add|launch|offer)|plan\s+to\s+(?:add|launch|offer)|will\s+(?:add|launch|offer)|upcoming)\b(?:[\s,;:—-]+[\w']+){0,5}[\s:—-]*$", before):
+                continue
+            if re.match(r"^[\s,;:()—-]*(?:(?:is|are|will\s+be)\s+)?(?:coming\s+soon|available\s+soon|launch(?:es|ing)?\s+(?:soon|next\b)|starts?\s+next\b|planned\b|not\s+yet\b)", after):
+                continue
             return True
     return False
 
