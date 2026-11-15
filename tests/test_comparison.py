@@ -180,3 +180,37 @@ def test_planned_ordering_does_not_create_a_fake_competitor_website_gap():
     ])
     ordering=next(x for x in rows if x["feature"]=="online ordering")
     assert ordering["competitors_with_feature"]==["Operational"]
+
+
+
+def test_competitor_scan_count_excludes_unavailable_feature_evidence():
+    target = observed_features('<h1>Pizza Kitchen</h1>', 'pizza')
+    operational = observed_features('<a href="/order-online">Order online</a>', 'pizza')
+    peers = [
+        {'name':'Verified rival','features':operational},
+        {'name':'Different evidence only','features':{'catering':{'observed':False}}},
+        {'name':'Unscanned','website':'https://unavailable.example/'},
+        {'name':'Malformed result','features':{'online ordering':{'observed':'false'}}},
+        {'name':'Explicitly not observed',
+         'features':{'online ordering':{'observed':False,'status':'not_observed_on_page'}}},
+    ]
+    rows = compare_features(target, peers)
+    ordering = next(row for row in rows if row['feature']=='online ordering')
+    assert ordering['competitors_scanned'] == 2
+    assert ordering['competitors_with_feature'] == ['Verified rival']
+    assert [item['status'] for item in ordering['competitor_details']] == [
+        'observed','unknown','unknown','unknown','not_observed_on_page']
+    catering = next(row for row in rows if row['feature']=='catering')
+    assert catering['competitors_scanned'] == 2
+    assert catering['competitor_details'][1]['status'] == 'not_observed_on_page'
+
+
+def test_zero_sourced_competitors_do_not_appear_as_a_negative_audit():
+    target = observed_features('<h1>Roofing</h1>', 'roofing')
+    rows = compare_features(target, [
+        {'name':'Website unreachable','features':{}},
+        {'name':'No captured page'},
+    ])
+    assert all(row['competitors_scanned'] == 0 for row in rows)
+    assert all(not row['competitors_with_feature'] for row in rows)
+    assert all(detail['status']=='unknown' for row in rows for detail in row['competitor_details'])
