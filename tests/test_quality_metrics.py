@@ -98,3 +98,32 @@ def test_chain_branches_cannot_inflate_independent_website_prevalence():
     assert result['passing_count'] == 1
     assert len(result['sources']) == 2
     assert 'not independent' in result['note']
+
+
+
+def test_hidden_template_and_css_invisible_images_do_not_inflate_visual_findings():
+    html = '''<html><body><main>
+      <template><img src="/template.jpg"></template>
+      <noscript><img src="/noscript.jpg"></noscript>
+      <div hidden><img src="/hidden-ancestor.jpg"></div>
+      <div style="display : none !important"><img src="/hidden-style.jpg"></div>
+      <section style="visibility: hidden"><img src="/invisible.jpg"></section>
+      <img src="/pixel.gif" width="1" height="1">
+      <img src="/visible.jpg" alt="A genuine product photograph" width="1200" height="800">
+    </main></body></html>'''
+    report = analyze_html(html, 'https://example.com/', 7)
+    findings = {item['id']: item for item in report['findings']}
+    assert report['observations']['images_missing_alt'] == 0
+    assert report['observations']['images_without_intrinsic_dimensions'] == 0
+    assert findings['image_alt']['passed'] is True
+    assert findings['image_dimensions']['passed'] is True
+
+
+def test_visible_undimensioned_image_still_has_real_audit_findings():
+    html = '''<html><body><main>
+       <section style="display:block"><img src="/visible.jpg"></section>
+       <aside style="display:none"><img src="/not-rendered.jpg"></aside>
+    </main></body></html>'''
+    report = analyze_html(html, 'https://example.com/', 3)
+    assert report['observations']['images_missing_alt'] == 1
+    assert report['observations']['images_without_intrinsic_dimensions'] == 1

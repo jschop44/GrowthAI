@@ -18,6 +18,22 @@ def substantive_images(soup, url):
     """Exclude known source tracking pixels from substantive image diagnostics."""
     images = []
     for img in soup.find_all('img'):
+        # Template, no-script, and CSS/HTML-hidden subtrees are not rendered
+        # image content. Counting them as visible page photography yields
+        # fabricated layout-shift and missing-alt findings for draft widgets.
+        hidden = False
+        for node in [img, *img.parents]:
+            if not getattr(node, 'name', None):
+                continue
+            if node.name in {'template', 'noscript', 'script'} or node.has_attr('hidden'):
+                hidden = True
+                break
+            style = re.sub(r'\s+', '', str(node.get('style') or '').lower())
+            if re.search(r'(?:^|;)(?:display:none(?:!important)?|visibility:hidden(?:!important)?)(?:;|$)', style):
+                hidden = True
+                break
+        if hidden:
+            continue
         source = str(img.get('src') or '')
         if re.search(r'/akam/\d+/pixel_', urlparse(urljoin(url, source)).path, re.I):
             continue
