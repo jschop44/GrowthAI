@@ -13,6 +13,21 @@ SIGNALS = {
     "dentist": {"online appointments": ("book appointment", "schedule online"), "insurance information": ("insurance",)},
 }
 
+def affirmed_feature(text, terms):
+    """Only count affirmative visible claims, not explicit service denials."""
+    text = re.sub(r"\s+", " ", str(text or "").lower()).strip()[:2000]
+    for term in terms:
+        for match in re.finditer(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text):
+            before = text[max(0, match.start() - 72):match.start()]
+            after = text[match.end():match.end() + 48]
+            if re.search(r"\b(?:no|not|never|without|don't|doesn't|cannot|can't|unavailable)\b(?:[\s,;:—-]+[\w']+){0,5}[\s:—-]*$", before):
+                continue
+            if re.search(r"^(?:[\s,;:—-]+\w+){0,6}[\s:—-]+(?:not|unavailable|discontinued|suspended|closed)\b", after) or re.match(r"^\s*(?:not|unavailable|discontinued|suspended|closed)\b", after):
+                continue
+            return True
+    return False
+
+
 def observed_features(html, industry, source_url=None):
     soup = BeautifulSoup(html, "html.parser")
     # A hidden menu template, disabled modal, screen-reader-excluded component
@@ -29,13 +44,20 @@ def observed_features(html, industry, source_url=None):
                 or str(element.get("aria-hidden") or "").lower() == "true"
                 or re.search(r"(?:^|;)(?:display:none(?:!important)?|visibility:hidden(?:!important)?)(?:;|$)", inline_style)):
             element.decompose()
-    visible = soup.get_text(" ", strip=True).lower()
-    links = " ".join((a.get("href") or "") + " " + a.get_text(" ", strip=True) for a in soup.find_all("a", href=True)).lower()
-    haystack = (visible + " " + links)[:80000]
+    # Evidence is assessed per visible text node. Combining the entire page
+    # can make "We do not offer reservations" a positive feature claim.
+    chunks = list(soup.stripped_strings)[:2000]
+    links = [(a.get_text(" ", strip=True), a.get("href") or "") for a in soup.find_all("a", href=True)][:300]
     observed_at = datetime.now(timezone.utc).isoformat()
     output = {}
     for name, terms in SIGNALS.get(industry or "", {}).items():
-        found = any(re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", haystack) for term in terms)
+        found = any(affirmed_feature(chunk, terms) for chunk in chunks)
+        if not found:
+            # Navigation URLs count only when their labels do not disclaim
+            # availability; no offsite lookup or feature inference is made.
+            found = any(affirmed_feature(href.replace("/", " ").replace("-", " "), terms)
+                        and not (label and re.search(r"\b(?:no|not|unavailable|disabled|discontinued)\b", label, re.I))
+                        for label, href in links)
         output[name] = {
             "observed": bool(found),
             "status": "observed" if found else "not_observed_on_page",
